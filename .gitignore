@@ -5,3 +5,4 @@ coverage/
 .claude
 .git
 .ruby-version
+.mcp.json
