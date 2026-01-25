@@ -1,0 +1,90 @@
+# Asset Inventory Configuration
+# This file defines all managed systems in the lab environment
+#
+# Copy this file to inventory.yml and customize for your environment:
+#   cp config/inventory.yml.example config/inventory.yml
+
+# Credential references (actual credentials stored separately or via environment)
+credentials:
+  windows_domain:
+    type: winrm
+    username: ${DOMAIN_ADMIN_USER}
+    domain: ${DOMAIN_NAME}
+  linux_ssh:
+    type: ssh
+    username: ${SSH_USER}
+    key_file: ~/.ssh/lab_key
+
+# Managed assets
+assets:
+  # Windows Infrastructure
+  - hostname: dc01
+    ip: 192.168.1.10
+    os: windows_server
+    os_version: "2022"
+    role: domain_controller
+    credential_ref: windows_domain
+    tags:
+      - infrastructure
+      - windows
+
+  - hostname: srv01
+    ip: 192.168.1.11
+    os: windows_server
+    os_version: "2022"
+    role: member_server
+    credential_ref: windows_domain
+    tags:
+      - infrastructure
+      - windows
+
+  # Windows Endpoints
+  - hostname: win11-df
+    ip: 192.168.1.20
+    os: windows_desktop
+    os_version: "11"
+    role: endpoint
+    deep_freeze: true
+    credential_ref: windows_domain
+    tags:
+      - endpoint
+      - windows
+      - deep_freeze
+      - primary_test_target
+
+  - hostname: win11-ctrl1
+    ip: 192.168.1.21
+    os: windows_desktop
+    os_version: "11"
+    role: endpoint
+    deep_freeze: false
+    credential_ref: windows_domain
+    tags:
+      - endpoint
+      - windows
+      - control
+
+  # Linux Infrastructure
+  - hostname: fedora-ws
+    ip: 192.168.1.30
+    os: linux
+    os_version: fedora
+    package_manager: dnf
+    role: workstation
+    credential_ref: linux_ssh
+    tags:
+      - workstation
+      - linux
+
+  - hostname: ubuntu-docker
+    ip: 192.168.1.32
+    os: linux
+    os_version: ubuntu
+    package_manager: apt
+    role: docker_host
+    credential_ref: linux_ssh
+    docker: true
+    tags:
+      - server
+      - linux
+      - docker

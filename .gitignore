@@ -3,6 +3,10 @@ vendor/bundle/
 *.gem
 coverage/
 .claude
-.git
 .ruby-version
-.mcp.json
+.mcp*
+tmp/
+.env
+.env.*
+.byebug_history
+config/inventory.yml
