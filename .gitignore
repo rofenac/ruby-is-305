@@ -7,6 +7,5 @@ coverage/
 .mcp*
 tmp/
 .env
-.env.*
 .byebug_history
 config/inventory.yml
