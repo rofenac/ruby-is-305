@@ -52,7 +52,7 @@ RSpec.describe PatchPilot::Inventory do
       it 'returns only Deep Freeze assets' do
         df_assets = inventory.deep_freeze_enabled
         expect(df_assets.count).to eq(1)
-        expect(df_assets.first.hostname).to eq('win11-df')
+        expect(df_assets.first.hostname).to eq('pc1')
       end
     end
 
@@ -103,8 +103,10 @@ RSpec.describe PatchPilot::Inventory do
       before do
         allow(ENV).to receive(:fetch).and_call_original
         allow(ENV).to receive(:fetch).with('DOMAIN_ADMIN_USER', nil).and_return('admin')
+        allow(ENV).to receive(:fetch).with('DOMAIN_ADMIN_PASSWORD', nil).and_return('password')
         allow(ENV).to receive(:fetch).with('DOMAIN_NAME', nil).and_return('TESTLAB')
         allow(ENV).to receive(:fetch).with('SSH_USER', nil).and_return('root')
+        allow(ENV).to receive(:fetch).with('SSH_PASSWORD', nil).and_return('password')
       end
 
       it 'returns credential config by reference' do

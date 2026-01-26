@@ -5,6 +5,8 @@ source 'https://rubygems.org'
 gem 'rake', '~> 13.3'
 
 # Remote execution
+gem 'bcrypt_pbkdf', '~> 1.1' # Required for ed25519 SSH key support
+gem 'ed25519', '~> 1.3'      # Required for ed25519 SSH key support
 gem 'net-ssh', '~> 7.2'
 gem 'winrm', '~> 2.3'
 

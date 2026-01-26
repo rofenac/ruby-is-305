@@ -81,6 +81,8 @@ module PatchPilot
           opts[:keys_only] = true
         elsif @password
           opts[:password] = @password
+          opts[:keys] = []           # Don't try to load local SSH keys
+          opts[:keys_only] = false   # Allow password auth
         end
 
         opts
