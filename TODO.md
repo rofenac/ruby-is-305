@@ -20,6 +20,116 @@ Trigger Windows Update installation remotely via PowerShell. This enables orches
 
 ---
 
+# NEXT: Linux Package Execution Module
+
+## Overview
+
+Trigger package updates remotely via SSH. Supports APT (Ubuntu, Kali) and DNF (Fedora).
+
+## Implementation Tasks
+
+- [ ] Create `PatchPilot::Linux::PackageExecutor` class
+- [ ] Implement `apt upgrade` / `dnf upgrade` execution
+- [ ] Handle confirmation prompts
+- [ ] Add progress tracking/status reporting
+- [ ] Write tests with mocked SSH responses
+
+---
+
+# COMPLETED: Web Dashboard (MVP)
+
+## Overview
+
+React-based web dashboard for visualizing and comparing patch status across all assets.
+
+## Files Created
+
+| File | Purpose |
+|------|---------|
+| `api/server.rb` | Sinatra API server wrapping PatchPilot |
+| `web-gui/` | Vite + React + TypeScript frontend |
+| `web-gui/src/components/` | Dashboard, AssetCard, AssetDetail, CompareView |
+| `web-gui/src/api/client.ts` | API client functions |
+| `web-gui/src/types/index.ts` | TypeScript interfaces |
+| `bin/dashboard` | Launch script for both servers |
+
+## Features
+
+- [x] Dark mode DaisyUI theme
+- [x] GSAP animations for smooth transitions
+- [x] Dashboard view with asset cards grouped by OS
+- [x] Stats showing total assets, Windows, Linux, Deep Freeze counts
+- [x] Asset detail modal showing updates/packages
+- [x] Compare view for side-by-side asset comparison
+- [x] Deep Freeze analysis when comparing frozen vs control endpoints
+- [x] API health status indicator
+- [x] Environment variable loading from .env
+
+## API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Health check |
+| `GET /api/inventory` | List all assets |
+| `GET /api/assets/:name` | Get asset details |
+| `GET /api/assets/:name/status` | Check if asset is online |
+| `GET /api/assets/:name/updates` | Get updates (Windows) or packages (Linux) |
+| `GET /api/compare?asset1=X&asset2=Y` | Compare two assets |
+
+## Status: COMPLETE (MVP)
+
+Completed on 2026-01-26. Dashboard functional with all core features.
+
+---
+
+# COMPLETED: Linux Package Query Module
+
+## Overview
+
+Query installed packages and available upgrades on Linux systems. Supports APT (Debian, Ubuntu, Kali) and DNF (Fedora, RHEL).
+
+## Files Created
+
+| File | Purpose |
+|------|---------|
+| `lib/patch_pilot/linux/package_query.rb` | Factory module + Package struct |
+| `lib/patch_pilot/linux/apt_query.rb` | APT implementation (dpkg-query/apt) |
+| `lib/patch_pilot/linux/dnf_query.rb` | DNF implementation (dnf list/check-update) |
+| `spec/patch_pilot/linux/package_query_spec.rb` | Factory + Package struct tests |
+| `spec/patch_pilot/linux/apt_query_spec.rb` | APT query tests |
+| `spec/patch_pilot/linux/dnf_query_spec.rb` | DNF query tests |
+
+## Implementation Tasks
+
+- [x] Create `PatchPilot::Linux::Package` struct
+- [x] Create `PatchPilot::Linux::PackageQuery` factory module
+- [x] Implement `AptQuery` class with dpkg-query/apt parsing
+- [x] Implement `DnfQuery` class with dnf output parsing
+- [x] Add filtering methods (packages_matching)
+- [x] Add comparison helper (compare_with)
+- [x] Write tests with mocked SSH responses
+
+## Usage
+
+```ruby
+inventory = PatchPilot.load_inventory
+asset = inventory.find('ubuntu-docker')
+conn = asset.connect(inventory)
+conn.connect
+
+query = PatchPilot::Linux::PackageQuery.for(conn, package_manager: 'apt')
+puts query.summary
+puts "Upgradable: #{query.upgradable_packages.count}"
+
+conn.close
+```
+
+## Status: COMPLETE
+
+Completed on 2026-01-26. 155 tests passing, RuboCop clean.
+
+---
+
 # COMPLETED: Windows Update Query Module
 
 ## Overview
@@ -42,35 +152,9 @@ Query installed Windows updates via PowerShell, parse results, and return struct
 - [x] Add comparison helper for Deep Freeze vs control endpoint analysis
 - [x] Write tests with mocked WinRM responses
 
-## Usage
-
-```ruby
-inventory = PatchPilot.load_inventory
-asset = inventory.find('pc1')
-conn = asset.connect(inventory)
-
-query = PatchPilot::Windows::UpdateQuery.new(conn)
-updates = query.installed_updates
-
-updates.each do |update|
-  puts "#{update.kb_number} - #{update.installed_on}"
-end
-
-# Compare Deep Freeze vs control endpoint
-query2 = PatchPilot::Windows::UpdateQuery.new(control_conn)
-comparison = query.compare_with(query2)
-puts "Only on Deep Freeze: #{comparison[:only_self]}"
-puts "Only on Control: #{comparison[:only_other]}"
-```
-
 ## Status: COMPLETE
 
-All tasks completed on 2026-01-26. 99 tests passing, no RuboCop offenses.
-
-Verified against live systems:
-- DC01 (Domain Controller)
-- PC1 (Deep Freeze endpoint)
-- PC2 (Control endpoint)
+All tasks completed on 2026-01-26. Verified against live systems.
 
 Deep Freeze verification successful: PC1 and PC2 have identical updates installed.
 
@@ -82,7 +166,7 @@ Deep Freeze verification successful: PC1 and PC2 have identical updates installe
 
 Implement the connection layer for remote command execution on Windows (WinRM) and Linux (SSH) systems.
 
-## Files to Create
+## Files Created
 
 | File | Purpose |
 |------|---------|
@@ -90,175 +174,6 @@ Implement the connection layer for remote command execution on Windows (WinRM) a
 | `lib/patch_pilot/connections/winrm.rb` | WinRM implementation |
 | `lib/patch_pilot/connections/ssh.rb` | SSH implementation |
 | `lib/patch_pilot/credential_resolver.rb` | Environment variable expansion |
-| `spec/patch_pilot/connection_spec.rb` | Connection factory tests |
-| `spec/patch_pilot/connections/winrm_spec.rb` | WinRM tests |
-| `spec/patch_pilot/connections/ssh_spec.rb` | SSH tests |
-| `spec/patch_pilot/credential_resolver_spec.rb` | Credential resolver tests |
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `Gemfile` | Add `winrm`, `net-ssh` gems |
-| `lib/patch_pilot.rb` | Require new modules |
-| `lib/patch_pilot/asset.rb` | Add `#connect` method |
-| `lib/patch_pilot/inventory.rb` | Use credential resolver |
-| `spec/patch_pilot/asset_spec.rb` | Add connection tests |
-
-## Implementation Tasks
-
-### 1. Add Dependencies to Gemfile
-
-```ruby
-gem 'winrm', '~> 2.3'
-gem 'net-ssh', '~> 7.2'
-```
-
-Run `bundle install` after adding.
-
----
-
-### 2. Create Credential Resolver
-
-**File**: `lib/patch_pilot/credential_resolver.rb`
-
-Expands environment variable placeholders like `${DOMAIN_ADMIN_USER}`:
-
-```ruby
-module PatchPilot
-  class CredentialResolver
-    def self.resolve(credentials_hash)
-      # Deep clone and expand ${VAR} patterns
-    end
-  end
-end
-```
-
----
-
-### 3. Create Base Connection Module
-
-**File**: `lib/patch_pilot/connection.rb`
-
-Factory pattern to create appropriate connection type:
-
-```ruby
-module PatchPilot
-  module Connection
-    Result = Struct.new(:stdout, :stderr, :exit_code, keyword_init: true)
-
-    class Error < PatchPilot::Error; end
-    class AuthenticationError < Error; end
-    class ConnectionError < Error; end
-    class CommandError < Error; end
-
-    def self.for(asset, credentials)
-      # Returns WinRM or SSH connection based on asset.os
-    end
-  end
-end
-```
-
----
-
-### 4. Create WinRM Connection
-
-**File**: `lib/patch_pilot/connections/winrm.rb`
-
-```ruby
-module PatchPilot
-  module Connections
-    class WinRM
-      def initialize(host:, username:, password:, domain: nil, port: 5985)
-      def connect
-      def execute(command) -> Connection::Result
-      def close
-    end
-  end
-end
-```
-
----
-
-### 5. Create SSH Connection
-
-**File**: `lib/patch_pilot/connections/ssh.rb`
-
-```ruby
-module PatchPilot
-  module Connections
-    class SSH
-      def initialize(host:, username:, key_file: nil, password: nil, port: 22)
-      def connect
-      def execute(command) -> Connection::Result
-      def close
-    end
-  end
-end
-```
-
----
-
-### 6. Add Asset#connect Method
-
-**File**: `lib/patch_pilot/asset.rb`
-
-```ruby
-def connect(inventory)
-  creds = inventory.credential(credential_ref)
-  Connection.for(self, creds)
-end
-```
-
----
-
-### 7. Update Inventory#credential
-
-Integrate credential resolver to expand env vars when credentials are fetched.
-
----
-
-### 8. Update Main Module Requires
-
-**File**: `lib/patch_pilot.rb`
-
-Add requires for new modules.
-
----
-
-## Testing Strategy
-
-- **Unit tests**: Mock WinRM/SSH libraries, test connection logic
-- **Integration tests**: Mark with `:integration` tag, skip by default
-
----
-
-## Verification
-
-1. Run `bundle install` to install new gems
-2. Run `rake` to verify all tests pass and RuboCop is satisfied
-3. Manual verification (when lab available):
-   ```ruby
-   inventory = PatchPilot.load_inventory
-   asset = inventory.find('dc01')
-   conn = asset.connect(inventory)
-   result = conn.execute('hostname')
-   puts result.stdout  # => "dc01"
-   ```
-
----
-
-## Order of Implementation
-
-- [x] Add gems to Gemfile, run `bundle install`
-- [x] Create `CredentialResolver` with tests
-- [x] Update `Inventory#credential` to use resolver
-- [x] Create `Connection` module with Result struct and exceptions
-- [x] Create `Connections::WinRM` with tests
-- [x] Create `Connections::SSH` with tests
-- [x] Add `Asset#connect` method with tests
-- [x] Update `lib/patch_pilot.rb` requires
-- [x] Run `rake` to verify everything passes
 
 ## Status: COMPLETE
 

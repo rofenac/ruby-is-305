@@ -1,0 +1,60 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: dark --default, light;
+}
+
+/* Custom scrollbar for dark mode */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: oklch(var(--b2));
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(var(--p));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(var(--pf));
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Glass card effect */
+.glass-card {
+  background: oklch(var(--b1) / 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid oklch(var(--bc) / 0.1);
+}
+
+/* Glow effects */
+.glow-primary {
+  box-shadow: 0 0 20px oklch(var(--p) / 0.3);
+}
+
+.glow-success {
+  box-shadow: 0 0 15px oklch(var(--su) / 0.4);
+}
+
+.glow-error {
+  box-shadow: 0 0 15px oklch(var(--er) / 0.4);
+}
+
+/* Pulse animation for status indicators */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}

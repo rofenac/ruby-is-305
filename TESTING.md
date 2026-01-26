@@ -110,6 +110,122 @@ conn2.close
 "
 ```
 
+## Linux Package Query Testing
+
+### Query Packages on a Linux Host
+
+```bash
+export $(grep -v '^#' .env | xargs) && bundle exec ruby -e "
+require_relative 'lib/patch_pilot'
+
+inventory = PatchPilot.load_inventory
+asset = inventory.find('ubuntu-docker')
+conn = asset.connect(inventory)
+conn.connect
+
+query = PatchPilot::Linux::PackageQuery.for(conn, package_manager: 'apt')
+puts query.summary
+puts
+puts 'Upgradable packages:'
+query.upgradable_packages.each { |p| puts \"  #{p.name} -> #{p.version}\" }
+
+conn.close
+"
+```
+
+### Compare Two Linux Hosts
+
+```bash
+export $(grep -v '^#' .env | xargs) && bundle exec ruby -e "
+require_relative 'lib/patch_pilot'
+
+inventory = PatchPilot.load_inventory
+
+# Ubuntu host
+ubuntu = inventory.find('ubuntu-docker')
+conn1 = ubuntu.connect(inventory)
+conn1.connect
+query1 = PatchPilot::Linux::PackageQuery.for(conn1, package_manager: 'apt')
+
+# Kali host
+kali = inventory.find('kali')
+conn2 = kali.connect(inventory)
+conn2.connect
+query2 = PatchPilot::Linux::PackageQuery.for(conn2, package_manager: 'apt')
+
+# Compare
+comparison = query1.compare_with(query2)
+puts \"Common packages: #{comparison[:common].count}\"
+puts \"Only Ubuntu: #{comparison[:only_self].count}\"
+puts \"Only Kali: #{comparison[:only_other].count}\"
+
+conn1.close
+conn2.close
+"
+```
+
+## Web Dashboard
+
+### Running the Dashboard
+
+The web dashboard provides a visual interface for viewing and comparing assets.
+
+**Option 1: Use the launcher script (recommended)**
+
+```bash
+./bin/dashboard
+```
+
+This starts both servers and opens:
+- Frontend: http://localhost:5173
+- API: http://localhost:4567
+
+Press `Ctrl+C` to stop both servers.
+
+**Option 2: Run servers separately**
+
+```bash
+# Terminal 1 - Start the Ruby API server
+export $(grep -v '^#' .env | xargs) && bundle exec ruby api/server.rb
+
+# Terminal 2 - Start the Vite frontend dev server
+cd web-gui && npm run dev
+```
+
+### Dashboard Features
+
+- **Dashboard View**: Shows all assets grouped by OS (Windows/Linux) with stats
+- **Asset Details**: Click "View Details" to see installed updates (Windows) or packages (Linux)
+- **Compare View**: Select two assets to compare their updates/packages side-by-side
+- **Deep Freeze Analysis**: Automatically highlights differences when comparing frozen vs control endpoints
+
+### API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Health check |
+| `GET /api/inventory` | List all assets |
+| `GET /api/assets/:name` | Get asset details |
+| `GET /api/assets/:name/status` | Check if asset is online |
+| `GET /api/assets/:name/updates` | Get updates (Windows) or packages (Linux) |
+| `GET /api/compare?asset1=X&asset2=Y` | Compare two assets |
+
+### Testing the API Directly
+
+```bash
+# Health check
+curl http://localhost:4567/api/health
+
+# List inventory
+curl http://localhost:4567/api/inventory
+
+# Get asset details
+curl http://localhost:4567/api/assets/dc01
+
+# Compare two Windows endpoints
+curl "http://localhost:4567/api/compare?asset1=pc1&asset2=pc2"
+```
+
 ## Running Automated Tests
 
 ```bash

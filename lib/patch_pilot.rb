@@ -13,6 +13,7 @@ require_relative 'patch_pilot/connection'
 require_relative 'patch_pilot/asset'
 require_relative 'patch_pilot/inventory'
 require_relative 'patch_pilot/windows/update_query'
+require_relative 'patch_pilot/linux/package_query'
 
 module PatchPilot # rubocop:disable Style/Documentation
   class << self
