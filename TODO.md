@@ -2,15 +2,31 @@
 
 ---
 
-# NEXT: Windows Update Query Module
+# NEXT: Windows Update Execution Module
+
+## Overview
+
+Trigger Windows Update installation remotely via PowerShell. This enables orchestrated patch deployment across the environment.
+
+**Prerequisite**: Lab environment with Windows systems running and accessible via WinRM.
+
+## Implementation Tasks
+
+- [ ] Create `PatchPilot::Windows::UpdateExecutor` class
+- [ ] Implement Windows Update installation via PowerShell
+- [ ] Handle reboot requirements
+- [ ] Add progress tracking/status reporting
+- [ ] Write tests with mocked WinRM responses
+
+---
+
+# COMPLETED: Windows Update Query Module
 
 ## Overview
 
 Query installed Windows updates via PowerShell, parse results, and return structured data for comparison between Deep Freeze and control endpoints.
 
-**Prerequisite**: Lab environment with Windows systems running and accessible via WinRM.
-
-## Files to Create
+## Files Created
 
 | File | Purpose |
 |------|---------|
@@ -19,18 +35,18 @@ Query installed Windows updates via PowerShell, parse results, and return struct
 
 ## Implementation Tasks
 
-- [ ] Create `PatchPilot::Windows::UpdateQuery` class
-- [ ] Implement `Get-HotFix` PowerShell command execution
-- [ ] Parse output into structured `Update` objects (KB number, description, installed_on, installed_by)
-- [ ] Add filtering methods (by date range, by KB pattern)
-- [ ] Add comparison helper for Deep Freeze vs control endpoint analysis
-- [ ] Write tests with mocked WinRM responses
+- [x] Create `PatchPilot::Windows::UpdateQuery` class
+- [x] Implement `Get-HotFix` PowerShell command execution
+- [x] Parse output into structured `Update` objects (KB number, description, installed_on, installed_by)
+- [x] Add filtering methods (by date range, by KB pattern)
+- [x] Add comparison helper for Deep Freeze vs control endpoint analysis
+- [x] Write tests with mocked WinRM responses
 
-## Usage (planned)
+## Usage
 
 ```ruby
 inventory = PatchPilot.load_inventory
-asset = inventory.find('win11-df')
+asset = inventory.find('pc1')
 conn = asset.connect(inventory)
 
 query = PatchPilot::Windows::UpdateQuery.new(conn)
@@ -39,7 +55,24 @@ updates = query.installed_updates
 updates.each do |update|
   puts "#{update.kb_number} - #{update.installed_on}"
 end
+
+# Compare Deep Freeze vs control endpoint
+query2 = PatchPilot::Windows::UpdateQuery.new(control_conn)
+comparison = query.compare_with(query2)
+puts "Only on Deep Freeze: #{comparison[:only_self]}"
+puts "Only on Control: #{comparison[:only_other]}"
 ```
+
+## Status: COMPLETE
+
+All tasks completed on 2026-01-26. 99 tests passing, no RuboCop offenses.
+
+Verified against live systems:
+- DC01 (Domain Controller)
+- PC1 (Deep Freeze endpoint)
+- PC2 (Control endpoint)
+
+Deep Freeze verification successful: PC1 and PC2 have identical updates installed.
 
 ---
 

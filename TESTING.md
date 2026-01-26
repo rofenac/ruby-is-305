@@ -57,6 +57,59 @@ Result:
 Connection test successful!
 ```
 
+## Windows Update Query Testing
+
+### Query Updates on a Single Host
+
+```bash
+export $(grep -v '^#' .env | xargs) && bundle exec ruby -e "
+require_relative 'lib/patch_pilot'
+
+inventory = PatchPilot.load_inventory
+asset = inventory.find('dc01')
+conn = asset.connect(inventory)
+conn.connect
+
+query = PatchPilot::Windows::UpdateQuery.new(conn)
+puts query.summary
+puts
+query.installed_updates.each { |u| puts \"#{u.kb_number} - #{u.installed_on}\" }
+
+conn.close
+"
+```
+
+### Compare Deep Freeze vs Control Endpoint
+
+```bash
+export $(grep -v '^#' .env | xargs) && bundle exec ruby -e "
+require_relative 'lib/patch_pilot'
+
+inventory = PatchPilot.load_inventory
+
+# Deep Freeze endpoint
+pc1 = inventory.find('pc1')
+conn1 = pc1.connect(inventory)
+conn1.connect
+query1 = PatchPilot::Windows::UpdateQuery.new(conn1)
+
+# Control endpoint
+pc2 = inventory.find('pc2')
+conn2 = pc2.connect(inventory)
+conn2.connect
+query2 = PatchPilot::Windows::UpdateQuery.new(conn2)
+
+# Compare
+comparison = query1.compare_with(query2)
+puts \"Common: #{comparison[:common].count}\"
+puts \"Only PC1: #{comparison[:only_self].join(', ')}\"
+puts \"Only PC2: #{comparison[:only_other].join(', ')}\"
+
+conn1.close
+conn2.close
+"
+```
+
 ## Running Automated Tests
 
 ```bash
