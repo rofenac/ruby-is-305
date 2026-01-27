@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'dotenv/load'
 require 'sinatra'
 require 'sinatra/json'
 require 'sinatra/cross_origin'
@@ -118,8 +119,15 @@ end
 get '/api/assets/:name/status' do
   asset = find_asset(params[:name])
   conn = get_connection(asset)
-  conn.close
-  json name: asset.hostname, status: 'online'
+
+  begin
+    # Actually test the connection by executing a simple command
+    result = conn.execute('echo test')
+    status = result.success? ? 'online' : 'offline'
+    json name: asset.hostname, status: status
+  ensure
+    conn.close
+  end
 rescue StandardError => e
   json name: asset.hostname, status: 'offline', error: e.message
 end

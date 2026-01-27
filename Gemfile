@@ -11,6 +11,7 @@ gem 'net-ssh', '~> 7.2'
 gem 'winrm', '~> 2.3'
 
 # Web API
+gem 'dotenv', '~> 3.1'
 gem 'puma', '~> 6.4'
 gem 'rackup', '~> 2.1'
 gem 'sinatra', '~> 4.0'

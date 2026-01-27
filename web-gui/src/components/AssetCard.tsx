@@ -17,16 +17,21 @@ export function AssetCard({ asset, index, onSelect }: AssetCardProps) {
   const [checking, setChecking] = useState(false);
 
   useGSAP(() => {
-    if (cardRef.current) {
-      gsap.from(cardRef.current, {
-        opacity: 0,
-        y: 50,
-        scale: 0.9,
-        duration: 0.6,
-        delay: index * 0.1,
-        ease: 'power3.out',
-      });
-    }
+    requestAnimationFrame(() => {
+      if (cardRef.current) {
+        gsap.fromTo(cardRef.current,
+          { opacity: 0, y: 50, scale: 0.9 },
+          {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.6,
+            delay: index * 0.1,
+            ease: 'power3.out',
+          }
+        );
+      }
+    });
   }, { scope: cardRef, dependencies: [index] });
 
   const handleMouseEnter = () => {

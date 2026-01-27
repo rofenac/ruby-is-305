@@ -21,21 +21,29 @@ export function AssetDetail({ asset, onClose }: AssetDetailProps) {
   const [error, setError] = useState<string | null>(null);
 
   useGSAP(() => {
-    if (modalRef.current) {
-      gsap.from(modalRef.current, {
-        opacity: 0,
-        duration: 0.3,
-      });
-    }
-    if (contentRef.current) {
-      gsap.from(contentRef.current, {
-        scale: 0.9,
-        opacity: 0,
-        y: 50,
-        duration: 0.4,
-        ease: 'back.out(1.7)',
-      });
-    }
+    requestAnimationFrame(() => {
+      if (modalRef.current) {
+        gsap.fromTo(modalRef.current,
+          { opacity: 0 },
+          {
+            opacity: 1,
+            duration: 0.3,
+          }
+        );
+      }
+      if (contentRef.current) {
+        gsap.fromTo(contentRef.current,
+          { scale: 0.9, opacity: 0, y: 50 },
+          {
+            scale: 1,
+            opacity: 1,
+            y: 0,
+            duration: 0.4,
+            ease: 'back.out(1.7)',
+          }
+        );
+      }
+    });
   }, { scope: modalRef });
 
   useEffect(() => {
@@ -139,18 +147,23 @@ function WindowsUpdatesList({ data }: { data: WindowsUpdatesResponse }) {
   const listRef = useRef<HTMLDivElement>(null);
 
   useGSAP(() => {
-    if (listRef.current) {
-      const rows = listRef.current.querySelectorAll('tr');
-      if (rows.length > 0) {
-        gsap.from(rows, {
-          opacity: 0,
-          x: -20,
-          stagger: 0.03,
-          duration: 0.3,
-          ease: 'power2.out',
-        });
+    requestAnimationFrame(() => {
+      if (listRef.current) {
+        const rows = listRef.current.querySelectorAll('tr');
+        if (rows.length > 0) {
+          gsap.fromTo(rows,
+            { opacity: 0, x: -20 },
+            {
+              opacity: 1,
+              x: 0,
+              stagger: 0.03,
+              duration: 0.3,
+              ease: 'power2.out',
+            }
+          );
+        }
       }
-    }
+    });
   }, { scope: listRef, dependencies: [data] });
 
   return (
@@ -208,18 +221,23 @@ function LinuxPackagesList({ data }: { data: LinuxPackagesResponse }) {
   const listRef = useRef<HTMLDivElement>(null);
 
   useGSAP(() => {
-    if (listRef.current) {
-      const elements = listRef.current.querySelectorAll('.stat, tr');
-      if (elements.length > 0) {
-        gsap.from(elements, {
-          opacity: 0,
-          x: -20,
-          stagger: 0.03,
-          duration: 0.3,
-          ease: 'power2.out',
-        });
+    requestAnimationFrame(() => {
+      if (listRef.current) {
+        const elements = listRef.current.querySelectorAll('.stat, tr');
+        if (elements.length > 0) {
+          gsap.fromTo(elements,
+            { opacity: 0, x: -20 },
+            {
+              opacity: 1,
+              x: 0,
+              stagger: 0.03,
+              duration: 0.3,
+              ease: 'power2.out',
+            }
+          );
+        }
       }
-    }
+    });
   }, { scope: listRef, dependencies: [data] });
 
   return (

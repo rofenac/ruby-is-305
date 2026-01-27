@@ -97,17 +97,22 @@ RuboCop is configured with `NewCops: enable` - all new cops are automatically en
 
 1. ~~Asset inventory structure (YAML) - foundation for all operations~~ **DONE**
 2. ~~Remote execution layer (WinRM for Windows, SSH for Linux)~~ **DONE**
-3. **Windows Update query module (critical for Deep Freeze verification)** ← NEXT STEP
-4. Windows Update execution module (trigger updates remotely)
-5. Linux package query modules (APT/DNF)
-6. Linux package update execution modules
-7. Comparison/reporting logic (compliance reports, Deep Freeze verification)
-8. Confirmation/validation module (verify updates installed successfully)
+3. ~~Windows Update query module (critical for Deep Freeze verification)~~ **DONE**
+4. ~~Linux package query modules (APT/DNF)~~ **DONE**
+5. ~~Web Dashboard (MVP) - visualize and compare patch status~~ **DONE**
+6. ~~Dashboard bugfixes (status check, animations, connectivity)~~ **DONE**
+7. **Windows Update execution module (trigger updates remotely)** ← NEXT STEP
+8. Linux package update execution modules (apt/dnf upgrade)
+9. Confirmation/validation module (verify updates installed successfully)
 
-## Next Step: Windows Update Query Module
+## Current Status
 
-**Requires**: Lab environment with Windows systems to test against.
+The project is fully functional for **querying** patch status. All core query functionality is complete:
+- Windows Update queries via `Get-HotFix`
+- Linux package queries via APT/DNF
+- Web dashboard for visualization and comparison
+- Accurate connectivity testing with proper timeouts
 
-See **`TODO.md`** for the detailed implementation plan.
+**Next step**: Implement update execution capabilities (trigger Windows Update and Linux package updates remotely).
 
-**Summary**: Query installed Windows updates via `Get-HotFix` PowerShell cmdlet, parse KB numbers and installation dates, return structured data for Deep Freeze vs control endpoint comparison.
+See **`TODO.md`** for detailed implementation plans.

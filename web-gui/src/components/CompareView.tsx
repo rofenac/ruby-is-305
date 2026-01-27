@@ -18,14 +18,19 @@ export function CompareView({ inventory }: CompareViewProps) {
   const [error, setError] = useState<string | null>(null);
 
   useGSAP(() => {
-    if (containerRef.current) {
-      gsap.from(containerRef.current, {
-        opacity: 0,
-        y: 30,
-        duration: 0.6,
-        ease: 'power3.out',
-      });
-    }
+    requestAnimationFrame(() => {
+      if (containerRef.current) {
+        gsap.fromTo(containerRef.current,
+          { opacity: 0, y: 30 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            ease: 'power3.out',
+          }
+        );
+      }
+    });
   }, { scope: containerRef });
 
   const handleCompare = async () => {
@@ -40,16 +45,19 @@ export function CompareView({ inventory }: CompareViewProps) {
       setComparison(result);
 
       // Animate results after state update
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         if (resultsRef.current) {
-          gsap.from(resultsRef.current, {
-            opacity: 0,
-            y: 30,
-            duration: 0.5,
-            ease: 'power3.out',
-          });
+          gsap.fromTo(resultsRef.current,
+            { opacity: 0, y: 30 },
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.5,
+              ease: 'power3.out',
+            }
+          );
         }
-      }, 0);
+      });
     } catch (e) {
       setError((e as Error).message);
     }
@@ -272,16 +280,21 @@ function ComparisonResults({ comparison, asset1, asset2 }: ComparisonResultsProp
   const cardsRef = useRef<HTMLDivElement>(null);
 
   useGSAP(() => {
-    if (cardsRef.current && cardsRef.current.children.length > 0) {
-      gsap.from(cardsRef.current.children, {
-        opacity: 0,
-        y: 30,
-        scale: 0.95,
-        stagger: 0.1,
-        duration: 0.5,
-        ease: 'power3.out',
-      });
-    }
+    requestAnimationFrame(() => {
+      if (cardsRef.current && cardsRef.current.children.length > 0) {
+        gsap.fromTo(cardsRef.current.children,
+          { opacity: 0, y: 30, scale: 0.95 },
+          {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            stagger: 0.1,
+            duration: 0.5,
+            ease: 'power3.out',
+          }
+        );
+      }
+    });
   }, { scope: cardsRef, dependencies: [comparison] });
 
   const isWindows = comparison.type === 'windows_updates';

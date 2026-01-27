@@ -74,18 +74,21 @@ module PatchPilot
       private
 
       def connection_options
-        opts = { port: port, non_interactive: true }
+        {
+          port: port,
+          non_interactive: true,
+          timeout: 5 # Connection and command timeout in seconds
+        }.merge(auth_options)
+      end
 
+      def auth_options
         if key_file
-          opts[:keys] = [key_file]
-          opts[:keys_only] = true
+          { keys: [key_file], keys_only: true }
         elsif @password
-          opts[:password] = @password
-          opts[:keys] = []           # Don't try to load local SSH keys
-          opts[:keys_only] = false   # Allow password auth
+          { password: @password, keys: [], keys_only: false }
+        else
+          {}
         end
-
-        opts
       end
 
       def expand_key_file(path)

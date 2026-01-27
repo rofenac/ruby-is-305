@@ -1,0 +1,65 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'bundler/setup'
+require 'dotenv/load'
+require_relative '../lib/patch_pilot'
+
+inventory = PatchPilot.load_inventory
+
+# Test assets
+test_assets = %w[pc1 fedora kali ubuntu-docker]
+
+puts 'Testing connectivity to problem assets...'
+puts '=' * 60
+
+test_assets.each do |name|
+  asset = inventory.find(name)
+  next unless asset
+
+  puts "\n#{asset.hostname} (#{asset.ip}) - #{asset.os}"
+  puts '-' * 60
+
+  begin
+    conn = asset.connect(inventory)
+    puts '  ✓ Connection object created'
+
+    conn.connect
+    puts '  ✓ Connected successfully'
+
+    result = conn.execute('echo test')
+    if result.success?
+      puts '  ✓ Command executed successfully'
+      puts "    stdout: #{result.stdout.strip}"
+    else
+      puts "  ✗ Command failed (exit code: #{result.exit_code})"
+      puts "    stderr: #{result.stderr}" unless result.stderr.empty?
+    end
+
+    conn.close
+    puts '  ✓ Connection closed'
+  rescue PatchPilot::Connection::AuthenticationError => e
+    puts "  ✗ Authentication failed: #{e.message}"
+    puts '    - Check credentials in .env file'
+    puts '    - For Windows: Verify WinRM user permissions'
+    puts '    - For Linux: Verify SSH user exists and password is correct'
+  rescue PatchPilot::Connection::ConnectionError => e
+    puts "  ✗ Connection failed: #{e.message}"
+    puts '    - Ping works, so network is OK'
+    if asset.windows?
+      puts '    - WinRM might not be enabled. Run on target:'
+      puts '      winrm quickconfig'
+      puts '    - Check Windows Firewall allows WinRM (port 5985)'
+    else
+      puts '    - SSH service might not be running. Run on target:'
+      puts '      sudo systemctl status sshd'
+      puts '    - Check firewall allows SSH (port 22)'
+    end
+  rescue StandardError => e
+    puts "  ✗ Unexpected error: #{e.class} - #{e.message}"
+    puts "    #{e.backtrace.first(3).join("\n    ")}"
+  end
+end
+
+puts "\n#{'=' * 60}"
+puts 'Testing complete!'

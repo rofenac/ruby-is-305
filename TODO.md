@@ -36,6 +36,73 @@ Trigger package updates remotely via SSH. Supports APT (Ubuntu, Kali) and DNF (F
 
 ---
 
+# COMPLETED: Dashboard Status Check and Animation Fixes (2026-01-27)
+
+## Overview
+
+Critical bugfixes for the web dashboard to ensure accurate connectivity status and smooth GSAP animations.
+
+## Issues Fixed
+
+### 1. False Online Status
+**Problem**: Dashboard showed all assets as "online" even when powered off.
+
+**Root Cause**:
+- Status endpoint created connection objects but never tested them
+- Missing environment variable loading from `.env` file
+- No connection timeouts configured
+
+**Solution**:
+- Added `dotenv` gem to load `.env` file automatically
+- Modified `/api/assets/:name/status` to execute `echo test` command
+- Added connection timeouts: WinRM (5s connection, 30s commands), SSH (5s timeout)
+- Enhanced error messages with troubleshooting instructions
+
+### 2. GSAP Animation Stalling
+**Problem**: Entrance animations (fade/slide/scale) would stall on first render but work on subsequent interactions.
+
+**Root Cause**: GSAP animations tried to run before DOM elements were fully painted by the browser.
+
+**Solution**:
+- Wrapped all GSAP animations in `requestAnimationFrame()` to wait for paint
+- Changed `gsap.from()` to `gsap.fromTo()` for explicit start/end state control
+- Fixed in: Dashboard.tsx, AssetCard.tsx, AssetDetail.tsx, CompareView.tsx
+
+### 3. Domain Trust Issues
+**Issue**: PC1 (Deep Freeze endpoint) had broken domain trust preventing WinRM authentication.
+
+**Resolution**:
+- Used `Test-ComputerSecureChannel -Repair` to fix trust
+- Added domain user to "Remote Management Users" group
+- Granted PowerShell remoting permissions via `Set-PSSessionConfiguration`
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `Gemfile` | Added `dotenv` gem for environment loading |
+| `api/server.rb` | Added dotenv loading, fixed status endpoint to execute test command |
+| `lib/patch_pilot/connections/winrm.rb` | Added 5s/30s timeouts, enhanced auth error messages |
+| `lib/patch_pilot/connections/ssh.rb` | Added 5s timeout, refactored auth options |
+| `bin/test_connections` | Created diagnostic utility for testing connectivity |
+| `web-gui/src/components/*.tsx` | Fixed GSAP timing with requestAnimationFrame + fromTo |
+
+## Test Results
+
+All assets now correctly report status:
+- ✅ PC1 (Deep Freeze endpoint) - Windows
+- ✅ PC2, PC3 (Control endpoints) - Windows
+- ✅ DC01, DM1 - Windows Server
+- ✅ Fedora, Kali, Ubuntu-Docker - Linux
+
+155 RSpec tests passing, RuboCop clean.
+
+## Status: COMPLETE
+
+Completed on 2026-01-27. Dashboard now accurately reports connectivity and animations render smoothly.
+
+---
+
 # COMPLETED: Web Dashboard (MVP)
 
 ## Overview

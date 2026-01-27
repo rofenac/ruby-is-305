@@ -17,25 +17,34 @@ export function Dashboard({ inventory, loading, error, onSelectAsset, onRefresh 
   const statsRef = useRef<HTMLDivElement>(null);
 
   useGSAP(() => {
-    if (headerRef.current) {
-      gsap.from(headerRef.current, {
-        opacity: 0,
-        x: -50,
-        duration: 0.6,
-        ease: 'power3.out',
-      });
-    }
+    // Wait for next frame to ensure DOM is painted
+    requestAnimationFrame(() => {
+      if (headerRef.current) {
+        gsap.fromTo(headerRef.current,
+          { opacity: 0, x: -50 },
+          {
+            opacity: 1,
+            x: 0,
+            duration: 0.6,
+            ease: 'power3.out',
+          }
+        );
+      }
 
-    if (statsRef.current && statsRef.current.children.length > 0) {
-      gsap.from(statsRef.current.children, {
-        opacity: 0,
-        y: 30,
-        stagger: 0.1,
-        duration: 0.5,
-        delay: 0.3,
-        ease: 'power3.out',
-      });
-    }
+      if (statsRef.current && statsRef.current.children.length > 0) {
+        gsap.fromTo(statsRef.current.children,
+          { opacity: 0, y: 30 },
+          {
+            opacity: 1,
+            y: 0,
+            stagger: 0.1,
+            duration: 0.5,
+            delay: 0.3,
+            ease: 'power3.out',
+          }
+        );
+      }
+    });
   }, { dependencies: [inventory] });
 
   if (loading) {

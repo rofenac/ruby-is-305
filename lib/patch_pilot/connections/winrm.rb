@@ -50,6 +50,7 @@ module PatchPilot
       # @param command [String] command to execute
       # @return [Connection::Result] execution result with stdout, stderr, exit_code
       # @raise [Connection::CommandError] if command execution fails
+      # rubocop:disable Metrics/MethodLength
       def execute(command)
         ensure_connected
         output = @shell.run(command)
@@ -58,9 +59,12 @@ module PatchPilot
           stderr: output.stderr,
           exit_code: output.exitcode
         )
+      rescue ::WinRM::WinRMAuthorizationError => e
+        raise Connection::CommandError, winrm_auth_error_message(e)
       rescue ::WinRM::WinRMError => e
         raise Connection::CommandError, "Command execution failed: #{e.message}"
       end
+      # rubocop:enable Metrics/MethodLength
 
       # Close the connection and release resources
       #
@@ -85,7 +89,9 @@ module PatchPilot
           endpoint: "http://#{host}:#{port}/wsman",
           user: full_username,
           password: @password,
-          transport: :negotiate
+          transport: :negotiate,
+          receive_timeout: 5,      # 5 second timeout for connection
+          operation_timeout: 30    # 30 second timeout for commands
         }
       end
 
@@ -99,6 +105,24 @@ module PatchPilot
 
       def ensure_connected
         connect unless connected?
+      end
+
+      def winrm_auth_error_message(error)
+        <<~MSG
+          WinRM authorization failed for #{user_at_host}: #{error.message}
+
+          The user can connect but doesn't have permission to execute PowerShell commands.
+          To fix this, run these commands on #{host} as Administrator:
+
+          1. Add user to Remote Management Users group:
+             net localgroup "Remote Management Users" "#{full_username}" /add
+
+          2. Grant PowerShell remoting permissions:
+             Set-PSSessionConfiguration -Name Microsoft.PowerShell -ShowSecurityDescriptorUI
+
+          3. Or, if domain user needs admin rights:
+             net localgroup "Administrators" "#{full_username}" /add
+        MSG
       end
     end
   end
