@@ -52,7 +52,7 @@ RSpec.describe PatchPilot::Inventory do
       it 'returns only Deep Freeze assets' do
         df_assets = inventory.deep_freeze_enabled
         expect(df_assets.count).to eq(1)
-        expect(df_assets.first.hostname).to eq('pc1')
+        expect(df_assets.first.hostname).to eq('PC1')
       end
     end
 

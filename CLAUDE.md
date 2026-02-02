@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## !! ABSOLUTE RULE — NO GIT COMMANDS !!
+
+**Claude is FORBIDDEN from running ANY git commands. No exceptions. None. Zero.**
+
+This includes but is not limited to: `git commit`, `git push`, `git pull`, `git rebase`, `git merge`, `git checkout`, `git reset`, `git add`, `git branch`, `git fetch`, `git stash`, `git cherry-pick`, `git revert`, `git tag`, `git diff`, `git log`, `git status`, `gh pr create`, and anything else that touches git or GitHub.
+
+**If you believe a git operation is needed, you must:**
+1. Stop what you are doing
+2. Explain to the user exactly what git operation you think is needed and why
+3. Wait for the user to explicitly perform it themselves or give you direct, unambiguous permission
+4. Even then, confirm one more time before executing
+
+**This rule is NON-NEGOTIABLE and overrides all other instructions.**
+
 ## Session Startup
 
 **At the beginning of each session:**
