@@ -7,8 +7,68 @@ require_relative '../lib/patch_pilot'
 
 inventory = PatchPilot.load_inventory
 
-# Test assets
-test_assets = %w[pc1 fedora kali ubuntu-docker]
+# Test assets — include a working server (DM1) for comparison
+test_assets = %w[DM1 PC1 PC2 PC3 fedora kali docker]
+
+def run_test_command(conn)
+  result = conn.execute('echo test')
+  if result.success?
+    puts '  ✓ Command executed successfully'
+    puts "    stdout: #{result.stdout.strip}"
+  else
+    puts "  ✗ Command failed (exit code: #{result.exit_code})"
+    puts "    stderr: #{result.stderr}" unless result.stderr.empty?
+  end
+end
+
+def report_auth_error(error)
+  puts "  ✗ Authentication failed: #{error.message}"
+  puts '    - Check credentials in .env file'
+  puts '    - For Windows: Verify WinRM user permissions'
+  puts '    - For Linux: Verify SSH user exists and password is correct'
+end
+
+def report_connection_error(error, asset)
+  puts "  ✗ Connection failed: #{error.message}"
+  puts '    - Ping works, so network is OK'
+  print_connection_hints(asset)
+end
+
+def report_error(error, asset = nil)
+  case error
+  when PatchPilot::Connection::AuthenticationError
+    report_auth_error(error)
+  when PatchPilot::Connection::ConnectionError
+    report_connection_error(error, asset)
+  else
+    puts "  ✗ Unexpected error: #{error.class} - #{error.message}"
+    puts "    #{error.backtrace.first(3).join("\n    ")}"
+  end
+end
+
+def test_connection(asset, inventory)
+  conn = asset.connect(inventory)
+  puts '  ✓ Connection object created'
+  conn.connect
+  puts '  ✓ Connected successfully'
+  run_test_command(conn)
+  conn.close
+  puts '  ✓ Connection closed'
+rescue StandardError => e
+  report_error(e, asset)
+end
+
+def print_connection_hints(asset)
+  if asset.windows?
+    puts '    - WinRM might not be enabled. Run on target:'
+    puts '      winrm quickconfig'
+    puts '    - Check Windows Firewall allows WinRM (port 5985)'
+  else
+    puts '    - SSH service might not be running. Run on target:'
+    puts '      sudo systemctl status sshd'
+    puts '    - Check firewall allows SSH (port 22)'
+  end
+end
 
 puts 'Testing connectivity to problem assets...'
 puts '=' * 60
@@ -19,46 +79,7 @@ test_assets.each do |name|
 
   puts "\n#{asset.hostname} (#{asset.ip}) - #{asset.os}"
   puts '-' * 60
-
-  begin
-    conn = asset.connect(inventory)
-    puts '  ✓ Connection object created'
-
-    conn.connect
-    puts '  ✓ Connected successfully'
-
-    result = conn.execute('echo test')
-    if result.success?
-      puts '  ✓ Command executed successfully'
-      puts "    stdout: #{result.stdout.strip}"
-    else
-      puts "  ✗ Command failed (exit code: #{result.exit_code})"
-      puts "    stderr: #{result.stderr}" unless result.stderr.empty?
-    end
-
-    conn.close
-    puts '  ✓ Connection closed'
-  rescue PatchPilot::Connection::AuthenticationError => e
-    puts "  ✗ Authentication failed: #{e.message}"
-    puts '    - Check credentials in .env file'
-    puts '    - For Windows: Verify WinRM user permissions'
-    puts '    - For Linux: Verify SSH user exists and password is correct'
-  rescue PatchPilot::Connection::ConnectionError => e
-    puts "  ✗ Connection failed: #{e.message}"
-    puts '    - Ping works, so network is OK'
-    if asset.windows?
-      puts '    - WinRM might not be enabled. Run on target:'
-      puts '      winrm quickconfig'
-      puts '    - Check Windows Firewall allows WinRM (port 5985)'
-    else
-      puts '    - SSH service might not be running. Run on target:'
-      puts '      sudo systemctl status sshd'
-      puts '    - Check firewall allows SSH (port 22)'
-    end
-  rescue StandardError => e
-    puts "  ✗ Unexpected error: #{e.class} - #{e.message}"
-    puts "    #{e.backtrace.first(3).join("\n    ")}"
-  end
+  test_connection(asset, inventory)
 end
 
 puts "\n#{'=' * 60}"

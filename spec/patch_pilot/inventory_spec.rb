@@ -69,7 +69,7 @@ RSpec.describe PatchPilot::Inventory do
       it 'returns Docker hosts' do
         docker = inventory.docker_hosts
         expect(docker.count).to eq(1)
-        expect(docker.first.hostname).to eq('ubuntu-docker')
+        expect(docker.first.hostname).to eq('docker')
       end
     end
 
@@ -89,7 +89,7 @@ RSpec.describe PatchPilot::Inventory do
 
     describe '#find' do
       it 'finds asset by hostname' do
-        asset = inventory.find('dc01')
+        asset = inventory.find('DC1')
         expect(asset).not_to be_nil
         expect(asset.role).to eq('domain_controller')
       end

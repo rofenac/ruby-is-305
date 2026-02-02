@@ -77,15 +77,15 @@ module PatchPilot
         {
           port: port,
           non_interactive: true,
-          timeout: 5 # Connection and command timeout in seconds
+          timeout: 10 # Connection timeout in seconds
         }.merge(auth_options)
       end
 
       def auth_options
-        if key_file
+        if key_file && File.exist?(key_file)
           { keys: [key_file], keys_only: true }
         elsif @password
-          { password: @password, keys: [], keys_only: false }
+          { password: @password }
         else
           {}
         end

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'socket'
 require 'winrm'
 
 module PatchPilot
@@ -7,6 +8,7 @@ module PatchPilot
     # WinRM connection for remote command execution on Windows systems.
     # Uses Windows Remote Management protocol over HTTP/HTTPS.
     class WinRM
+      CONNECT_TIMEOUT = 10
       DEFAULT_PORT = 5985
 
       attr_reader :host, :username, :domain, :port
@@ -34,11 +36,12 @@ module PatchPilot
       # @raise [Connection::ConnectionError] if connection fails
       # @raise [Connection::AuthenticationError] if authentication fails
       def connect
-        @connection = ::WinRM::Connection.new(connection_options)
-        @shell = @connection.shell(:powershell)
+        open_shell
         self
       rescue ::WinRM::WinRMAuthorizationError => e
         raise Connection::AuthenticationError, "Authentication failed for #{user_at_host}: #{e.message}"
+      rescue Connection::ConnectionError
+        raise
       rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT, Errno::EHOSTUNREACH => e
         raise Connection::ConnectionError, "Failed to connect to #{host}:#{port}: #{e.message}"
       rescue StandardError => e
@@ -84,13 +87,39 @@ module PatchPilot
 
       private
 
+      def verify_port_reachable
+        Socket.tcp(host, port, connect_timeout: CONNECT_TIMEOUT, &:close)
+      rescue Errno::ETIMEDOUT, Errno::EHOSTUNREACH
+        raise Connection::ConnectionError, "Cannot reach #{host}:#{port} (timed out after #{CONNECT_TIMEOUT}s)"
+      rescue Errno::ECONNREFUSED
+        raise Connection::ConnectionError,
+              "Connection refused at #{host}:#{port} — WinRM may not be enabled. Run: winrm quickconfig"
+      end
+
+      def open_shell
+        verify_port_reachable
+        thread = Thread.new { establish_connection }
+        thread.report_on_exception = false
+        return thread.value if thread.join(CONNECT_TIMEOUT)
+
+        thread.kill
+        raise Connection::ConnectionError,
+              "WinRM negotiate timed out for #{host}:#{port} after #{CONNECT_TIMEOUT}s"
+      end
+
+      def establish_connection
+        @connection = ::WinRM::Connection.new(connection_options)
+        @shell = @connection.shell(:powershell)
+      end
+
       def connection_options
         {
           endpoint: "http://#{host}:#{port}/wsman",
           user: full_username,
           password: @password,
           transport: :negotiate,
-          receive_timeout: 5,      # 5 second timeout for connection
+          open_timeout: 10,        # 10 second timeout for TCP connect
+          receive_timeout: 10,     # 10 second timeout for receiving data
           operation_timeout: 30    # 30 second timeout for commands
         }
       end

@@ -14,6 +14,10 @@ RSpec.describe PatchPilot::Connections::WinRM do
     )
   end
 
+  before do
+    allow(Socket).to receive(:tcp).and_return(nil)
+  end
+
   describe '#initialize' do
     it 'stores connection parameters' do
       expect(connection.host).to eq('192.168.1.10')
@@ -75,12 +79,12 @@ RSpec.describe PatchPilot::Connections::WinRM do
 
     context 'when connection is refused' do
       before do
-        allow(WinRM::Connection).to receive(:new).and_raise(Errno::ECONNREFUSED)
+        allow(Socket).to receive(:tcp).and_raise(Errno::ECONNREFUSED)
       end
 
       it 'raises ConnectionError' do
         expect { connection.connect }
-          .to raise_error(PatchPilot::Connection::ConnectionError, /Failed to connect/)
+          .to raise_error(PatchPilot::Connection::ConnectionError, /Connection refused/)
       end
     end
   end

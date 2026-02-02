@@ -57,6 +57,8 @@ RSpec.describe PatchPilot::Connections::SSH do
     end
 
     it 'passes correct options for key-based auth' do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.expand_path('~/.ssh/id_rsa')).and_return(true)
       connection.connect
       expect(Net::SSH).to have_received(:start).with(
         '192.168.1.30',
