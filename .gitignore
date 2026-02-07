@@ -10,6 +10,7 @@ tmp/
 .env
 .byebug_history
 config/inventory.yml
+CLAUDE.md
 
 # Logs
 logs
