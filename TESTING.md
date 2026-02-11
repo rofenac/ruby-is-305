@@ -164,6 +164,85 @@ conn2.close
 "
 ```
 
+## Windows Update Execution
+
+### IRB Session
+
+```bash
+bundle exec irb -r ./lib/patch_pilot -r dotenv/load
+```
+
+```ruby
+inv = PatchPilot.load_inventory
+asset = inv.find('PC2')  # Control endpoint, no Deep Freeze
+conn = asset.connect(inv)
+conn.connect
+
+executor = PatchPilot::Windows::UpdateExecutor.new(conn)
+
+# 1. Search (read-only)
+available = executor.available_updates
+available.each { |u| puts "#{u.kb_number} - #{u.title} (#{u.size_mb} MB)" }
+
+# 2. Download only (no install)
+# executor.download_updates
+
+# 3. Install specific KBs
+# executor.install_updates(kb_numbers: ['KB5073379'])
+
+# 4. Install all available
+# executor.install_updates
+
+executor.reboot_required?
+conn.close
+```
+
+### Targeted Spec
+
+```bash
+rake spec SPEC=spec/patch_pilot/windows/update_executor_spec.rb
+```
+
+## Linux Package Execution
+
+### IRB Session
+
+```ruby
+inv = PatchPilot.load_inventory
+asset = inv.find('docker')
+conn = asset.connect(inv)
+conn.connect
+
+executor = PatchPilot::Linux::PackageExecutor.for(conn, package_manager: asset.package_manager)
+
+result = executor.upgrade_all
+puts "Success: #{result.succeeded?}, Upgraded: #{result.upgraded_count}"
+puts result.upgraded_packages.join(', ')
+
+# Or target specific packages:
+# result = executor.upgrade_packages(packages: ['curl', 'vim'])
+
+executor.reboot_required?
+conn.close
+```
+
+### Targeted Specs
+
+```bash
+rake spec SPEC=spec/patch_pilot/linux/apt_executor_spec.rb
+rake spec SPEC=spec/patch_pilot/linux/dnf_executor_spec.rb
+```
+
+### Recommended Live Test Order
+
+| Step | Target | Action | Risk |
+|------|--------|--------|------|
+| 1 | PC2 | `available_updates` | None (read-only) |
+| 2 | PC2 | `download_updates` | Low (download only) |
+| 3 | PC2 | `install_updates` | Medium (installs updates) |
+| 4 | docker | `upgrade_all` | Medium (least critical Linux) |
+| 5 | PC1 | Full cycle | High (thaw Deep Freeze first) |
+
 ## Web Dashboard
 
 ### Running the Dashboard

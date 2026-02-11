@@ -2,33 +2,35 @@
 
 ---
 
-# NEXT: Windows Update Execution Module
+# NEXT: Frontend Integration for Execution Modules
 
-Trigger Windows Update installation remotely via PowerShell.
+Wire UpdateExecutor and PackageExecutor into the Sinatra API and React dashboard.
 
-**Prerequisite**: Lab environment with Windows systems running and accessible via WinRM.
-
-- [ ] Create `PatchPilot::Windows::UpdateExecutor` class
-- [ ] Implement Windows Update installation via PowerShell
-- [ ] Handle reboot requirements
-- [ ] Add progress tracking/status reporting
-- [ ] Write tests with mocked WinRM responses
-
----
-
-# NEXT: Linux Package Execution Module
-
-Trigger package updates remotely via SSH. Supports APT (Ubuntu, Kali) and DNF (Fedora).
-
-- [ ] Create `PatchPilot::Linux::PackageExecutor` class
-- [ ] Implement `apt upgrade` / `dnf upgrade` execution
-- [ ] Handle confirmation prompts
-- [ ] Add progress tracking/status reporting
-- [ ] Write tests with mocked SSH responses
+- [ ] Add `POST /api/assets/:name/updates/install` endpoint (Windows)
+- [ ] Add `POST /api/assets/:name/packages/upgrade` endpoint (Linux)
+- [ ] Add `GET /api/assets/:name/reboot-status` endpoint
+- [ ] Add `POST /api/assets/:name/reboot` endpoint
+- [ ] Frontend controls: install/upgrade buttons, reboot prompts, progress display
+- [ ] Goal: all backend functionality accessible from the dashboard
 
 ---
 
 # Completed
+
+## Linux Package Execution Module (2026-02-10)
+- `PatchPilot::Linux::PackageExecutor` factory with `AptExecutor` and `DnfExecutor` implementations
+- `upgrade_all`, `upgrade_packages(packages:)`, `reboot_required?`
+- APT: `DEBIAN_FRONTEND=noninteractive apt-get upgrade -y`, reboot check via `/var/run/reboot-required`
+- DNF: `dnf upgrade -y`, reboot check via `needs-restarting -r` with availability guard
+- Parses upgraded package names and counts from command output
+- 246 RSpec tests passing, RuboCop clean
+
+## Windows Update Execution Module (2026-02-10)
+- `PatchPilot::Windows::UpdateExecutor` — search, download, and install updates via COM API over WinRM
+- Three structs: `AvailableUpdate`, `UpdateActionResult`, `InstallationResult`
+- KB filtering, reboot detection (registry checks), explicit reboot trigger
+- Reboot never automatic — critical for Deep Freeze endpoints
+- 208 RSpec tests passing, RuboCop clean
 
 ## Connectivity Fixes (2026-02-02)
 - Fixed missing `password` fields in `config/inventory.yml` credentials (WinRM and SSH)
