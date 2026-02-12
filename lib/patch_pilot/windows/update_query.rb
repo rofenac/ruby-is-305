@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-require 'csv'
+require 'json'
 require 'date'
 
 module PatchPilot
   module Windows
-    # Represents a single Windows update (hotfix)
+    # Represents a single installed Windows update
     Update = Struct.new(:kb_number, :description, :installed_on, :installed_by, keyword_init: true) do
       # Check if this is a security update
       #
@@ -28,12 +28,10 @@ module PatchPilot
       end
     end
 
-    # Query Windows Update history via Get-HotFix PowerShell cmdlet.
-    # Parses results into structured Update objects for analysis.
-    class UpdateQuery
-      POWERSHELL_COMMAND = 'Get-HotFix | Select-Object HotFixID, Description, InstalledOn, InstalledBy | ' \
-                           'ConvertTo-Csv -NoTypeInformation'
-
+    # Query installed Windows Updates via the Windows Update COM API.
+    # Uses IUpdateSearcher.Search("IsInstalled=1") which returns the complete
+    # set of installed updates — unlike Get-HotFix which only returns CBS hotfixes.
+    class UpdateQuery # rubocop:disable Metrics/ClassLength
       attr_reader :connection
 
       # Initialize with an established connection
@@ -124,40 +122,90 @@ module PatchPilot
 
       private
 
+      def query_script
+        <<~PS
+          $seen = @{}
+          $updates = @()
+          foreach ($hf in (Get-HotFix)) {
+              $kb = $hf.HotFixID
+              if ([string]::IsNullOrEmpty($kb) -or $kb -eq 'File 1') { continue }
+              $kbNum = $kb -replace '^KB', ''
+              if ($seen.ContainsKey($kbNum)) { continue }
+              $seen[$kbNum] = $true
+              $desc = if ($hf.Description -match 'Security') { 'Security Update' }
+                      else { $hf.Description }
+              $date = if ($hf.InstalledOn) {
+                          $hf.InstalledOn.ToString('M/d/yyyy h:mm:ss tt')
+                      } else { '' }
+              $updates += [PSCustomObject]@{
+                  KBArticleIDs = $kbNum
+                  Description  = $desc
+                  InstalledOn  = $date
+              }
+          }
+          $Session = New-Object -ComObject Microsoft.Update.Session
+          $Searcher = $Session.CreateUpdateSearcher()
+          $HistoryCount = $Searcher.GetTotalHistoryCount()
+          if ($HistoryCount -gt 0) {
+              $History = $Searcher.QueryHistory(0, $HistoryCount)
+              for ($i = 0; $i -lt $History.Count; $i++) {
+                  $Entry = $History.Item($i)
+                  if ($Entry.Operation -ne 1) { continue }
+                  if ($Entry.ResultCode -ne 2 -and $Entry.ResultCode -ne 3) { continue }
+                  $kb = ''
+                  if ($Entry.Title -match '\\(KB(\\d+)\\)') { $kb = $Matches[1] }
+                  if ([string]::IsNullOrEmpty($kb)) { continue }
+                  if ($seen.ContainsKey($kb)) { continue }
+                  $seen[$kb] = $true
+                  $desc = if ($Entry.Title -match 'Security|Malicious') { 'Security Update' }
+                          else { 'Update' }
+                  $updates += [PSCustomObject]@{
+                      KBArticleIDs = $kb
+                      Description  = $desc
+                      InstalledOn  = $Entry.Date.ToString('M/d/yyyy h:mm:ss tt')
+                  }
+              }
+          }
+          if ($updates.Count -eq 0) { Write-Output '[]' }
+          else { Write-Output (ConvertTo-Json @($updates) -Compress) }
+        PS
+      end
+
       def fetch_updates
-        result = connection.execute(POWERSHELL_COMMAND)
-        parse_csv_output(result.stdout)
+        result = connection.execute(query_script)
+        parse_json_output(result.stdout)
       end
 
-      def parse_csv_output(csv_string)
-        return [] if csv_string.nil? || csv_string.strip.empty?
+      def parse_json_output(json_string)
+        return [] if json_string.nil? || json_string.strip.empty?
 
-        csv = CSV.parse(csv_string.strip, headers: true)
-        csv.map { |row| build_update(row) }
+        data = JSON.parse(json_string.strip)
+        data = [data] unless data.is_a?(Array)
+        data.map { |entry| build_update(entry) }
       end
 
-      def build_update(row)
+      def build_update(entry)
         Update.new(
-          kb_number: row['HotFixID'],
-          description: row['Description'],
-          installed_on: parse_date(row['InstalledOn']),
-          installed_by: presence(row['InstalledBy'])
+          kb_number: normalize_kb(entry['KBArticleIDs']),
+          description: entry['Description'],
+          installed_on: parse_date(entry['InstalledOn']),
+          installed_by: nil
         )
+      end
+
+      def normalize_kb(raw)
+        return nil if raw.nil? || raw.to_s.strip.empty?
+
+        kb = raw.strip.split(',').first
+        kb.start_with?('KB') ? kb : "KB#{kb}"
       end
 
       def parse_date(date_string)
         return nil if date_string.nil? || date_string.strip.empty?
 
-        # Windows date format: "1/14/2026 12:00:00 AM"
         DateTime.strptime(date_string.strip, '%m/%d/%Y %I:%M:%S %p').to_date
       rescue ArgumentError
         nil
-      end
-
-      def presence(value)
-        return nil if value.nil? || value.strip.empty?
-
-        value.strip
       end
 
       def date_range_string(updates)

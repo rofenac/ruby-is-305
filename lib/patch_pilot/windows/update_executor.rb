@@ -148,41 +148,59 @@ module PatchPilot
       private
 
       def fetch_available_updates
-        result = connection.execute(search_script)
+        result = connection.execute(search_task_script)
         validate_result!(result, 'update search')
-        parse_available_updates(result.stdout)
+        json = result.stdout.strip
+        detect_search_error!(json)
+        parse_available_updates(json)
       end
 
       def execute_update_action(action, kb_numbers)
-        result = connection.execute(action_script(action, kb_numbers))
+        script = action == :install ? install_task_script(kb_numbers) : action_script(:download, kb_numbers)
+        result = connection.execute(script)
         validate_result!(result, action.to_s)
         parse_installation_result(result.stdout)
       end
 
+      def search_task_script
+        build_task_wrapper(inner_search_script, task_name: 'Search')
+      end
+
       # rubocop:disable Metrics/MethodLength
-      def search_script
-        <<~PS
-          $Session = New-Object -ComObject Microsoft.Update.Session
-          $Searcher = $Session.CreateUpdateSearcher()
-          $SearchResult = $Searcher.Search("IsInstalled=0")
-          $updates = @()
-          foreach ($Update in $SearchResult.Updates) {
-              if ($Update.EulaAccepted -eq $false) { $Update.AcceptEula() }
-              $kbs = @($Update.KBArticleIDs) -join ','
-              $cats = @()
-              foreach ($cat in $Update.Categories) { $cats += $cat.Name }
-              $sev = if ($Update.MsrcSeverity) { $Update.MsrcSeverity } else { 'Unspecified' }
-              $updates += [PSCustomObject]@{
-                  KBArticleIDs = $kbs
-                  Title        = $Update.Title
-                  SizeBytes    = $Update.MaxDownloadSize
-                  Severity     = $sev
-                  IsDownloaded = [bool]$Update.IsDownloaded
-                  Categories   = ($cats -join ';')
+      def inner_search_script
+        <<~'PS'
+          $ErrorActionPreference = 'Stop'
+          $resultPath = 'C:\Windows\Temp\PatchPilotSearch_result.json'
+          try {
+              $Session = New-Object -ComObject Microsoft.Update.Session
+              $Searcher = $Session.CreateUpdateSearcher()
+              $Searcher.ServerSelection = 2
+              $SearchResult = $Searcher.Search("IsInstalled=0")
+              $updates = @()
+              foreach ($Update in $SearchResult.Updates) {
+                  if ($Update.EulaAccepted -eq $false) { $Update.AcceptEula() }
+                  $kbs = @($Update.KBArticleIDs) -join ','
+                  $cats = @()
+                  foreach ($cat in $Update.Categories) { $cats += $cat.Name }
+                  $sev = if ($Update.MsrcSeverity) { $Update.MsrcSeverity } else { 'Unspecified' }
+                  $updates += [PSCustomObject]@{
+                      KBArticleIDs = $kbs
+                      Title        = $Update.Title
+                      SizeBytes    = $Update.MaxDownloadSize
+                      Severity     = $sev
+                      IsDownloaded = [bool]$Update.IsDownloaded
+                      Categories   = ($cats -join ';')
+                  }
               }
+              if ($updates.Count -eq 0) {
+                  '[]' | Set-Content -Path $resultPath -Encoding UTF8
+              } else {
+                  ConvertTo-Json @($updates) -Compress | Set-Content -Path $resultPath -Encoding UTF8
+              }
+          } catch {
+              $err = @{ Error = $_.Exception.Message }
+              ConvertTo-Json $err -Compress | Set-Content -Path $resultPath -Encoding UTF8
           }
-          if ($updates.Count -eq 0) { Write-Output '[]' }
-          else { Write-Output (ConvertTo-Json @($updates) -Compress) }
         PS
       end
 
@@ -193,6 +211,7 @@ module PatchPilot
         <<~PS
           $Session = New-Object -ComObject Microsoft.Update.Session
           $Searcher = $Session.CreateUpdateSearcher()
+          $Searcher.ServerSelection = 2
           $SearchResult = $Searcher.Search("IsInstalled=0")
           #{kb_filter}
           $UpdateColl = New-Object -ComObject Microsoft.Update.UpdateColl
@@ -243,6 +262,112 @@ module PatchPilot
         PS
       end
 
+      # rubocop:disable Metrics/MethodLength
+      def inner_install_script(kb_numbers)
+        kb_filter = build_kb_filter(kb_numbers)
+        <<~'PS'.sub('KBFILTER_PLACEHOLDER', kb_filter)
+          $ErrorActionPreference = 'Stop'
+          $resultPath = 'C:\Windows\Temp\PatchPilotInstall_result.json'
+          try {
+              $Session = New-Object -ComObject Microsoft.Update.Session
+              $Searcher = $Session.CreateUpdateSearcher()
+              $Searcher.ServerSelection = 2
+              $SearchResult = $Searcher.Search("IsInstalled=0")
+              KBFILTER_PLACEHOLDER
+              $UpdateColl = New-Object -ComObject Microsoft.Update.UpdateColl
+              foreach ($Update in $SearchResult.Updates) {
+                  if ($Update.EulaAccepted -eq $false) { $Update.AcceptEula() }
+                  $kbs = @($Update.KBArticleIDs)
+                  $match = $KBFilter.Count -eq 0
+                  foreach ($kb in $kbs) {
+                      if ($KBFilter -contains $kb) { $match = $true; break }
+                  }
+                  if ($match) { $UpdateColl.Add($Update) | Out-Null }
+              }
+              if ($UpdateColl.Count -eq 0) {
+                  '{"ResultCode":2,"RebootRequired":false,"UpdateCount":0,"Updates":[]}' |
+                      Set-Content -Path $resultPath -Encoding UTF8
+              } else {
+                  $Downloader = $Session.CreateUpdateDownloader()
+                  $Downloader.Updates = $UpdateColl
+                  $Downloader.Download() | Out-Null
+                  $Installer = $Session.CreateUpdateInstaller()
+                  $Installer.Updates = $UpdateColl
+                  $InstResult = $Installer.Install()
+                  $results = @()
+                  for ($i = 0; $i -lt $UpdateColl.Count; $i++) {
+                      $u = $UpdateColl.Item($i)
+                      $r = $InstResult.GetUpdateResult($i)
+                      $results += [PSCustomObject]@{
+                          KBArticleIDs = (@($u.KBArticleIDs) -join ',')
+                          Title        = $u.Title
+                          ResultCode   = [int]$r.ResultCode
+                      }
+                  }
+                  $out = @{
+                      ResultCode     = [int]$InstResult.ResultCode
+                      RebootRequired = [bool]$InstResult.RebootRequired
+                      UpdateCount    = $UpdateColl.Count
+                      Updates        = @($results)
+                  }
+                  ConvertTo-Json $out -Compress | Set-Content -Path $resultPath -Encoding UTF8
+              }
+          } catch {
+              $err = @{ ResultCode = 4; RebootRequired = $false; UpdateCount = 0;
+                        Updates = @(); Error = $_.Exception.Message }
+              ConvertTo-Json $err -Compress | Set-Content -Path $resultPath -Encoding UTF8
+          }
+        PS
+      end
+
+      def install_task_script(kb_numbers)
+        inner = inner_install_script(kb_numbers)
+        build_task_wrapper(inner, task_name: 'Install')
+      end
+
+      def build_task_wrapper(inner_script, task_name:)
+        template = <<~'PS'
+          $scriptPath = 'C:\Windows\Temp\TASK_NAME_PLACEHOLDER.ps1'
+          $resultPath = 'C:\Windows\Temp\TASK_NAME_PLACEHOLDER_result.json'
+          $taskName = 'TASK_NAME_PLACEHOLDER'
+          Remove-Item -Path $resultPath -Force -ErrorAction SilentlyContinue
+          $script = @'
+          INNER_SCRIPT_PLACEHOLDER
+          '@
+          Set-Content -Path $scriptPath -Value $script -Encoding UTF8
+          $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
+              -Argument '-NoProfile -ExecutionPolicy Bypass -File "C:\Windows\Temp\TASK_NAME_PLACEHOLDER.ps1"'
+          Register-ScheduledTask -TaskName $taskName -Action $action `
+              -RunLevel Highest -User 'SYSTEM' -Force | Out-Null
+          Start-ScheduledTask -TaskName $taskName
+          $maxWait = 3600
+          $elapsed = 0
+          do {
+              Start-Sleep -Seconds 10
+              $elapsed += 10
+              if ($elapsed -ge $maxWait) {
+                  Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+                  Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+                  Remove-Item -Path $scriptPath -Force -ErrorAction SilentlyContinue
+                  throw "TASK_NAME_PLACEHOLDER timed out after $maxWait seconds"
+              }
+              $state = (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue).State
+          } while ($state -eq 'Running')
+          Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+          Remove-Item -Path $scriptPath -Force -ErrorAction SilentlyContinue
+          if (Test-Path $resultPath) {
+              $result = Get-Content -Path $resultPath -Raw
+              Remove-Item -Path $resultPath -Force -ErrorAction SilentlyContinue
+              Write-Output $result
+          } else {
+              throw 'TASK_NAME_PLACEHOLDER completed but no result file was created'
+          }
+        PS
+        template.gsub('TASK_NAME_PLACEHOLDER', "PatchPilot#{task_name}")
+                .sub('INNER_SCRIPT_PLACEHOLDER') { inner_script.chomp }
+      end
+      # rubocop:enable Metrics/MethodLength
+
       def build_kb_filter(kb_numbers)
         if kb_numbers.nil? || kb_numbers.empty?
           '$KBFilter = @()'
@@ -254,13 +379,13 @@ module PatchPilot
       end
 
       def reboot_check_script
-        <<~PS
+        <<~'PS'
           $reboot = $false
-          $cbsKey = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\RebootPending'
-          $wuKey = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Auto Update\\RebootRequired'
+          $cbsKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending'
+          $wuKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
           if (Test-Path $cbsKey) { $reboot = $true }
           if (Test-Path $wuKey) { $reboot = $true }
-          $pfro = Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager' -Name PendingFileRenameOperations -ErrorAction SilentlyContinue
+          $pfro = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -Name PendingFileRenameOperations -ErrorAction SilentlyContinue
           if ($pfro) { $reboot = $true }
           Write-Output $reboot
         PS
@@ -311,6 +436,17 @@ module PatchPilot
 
         kb = raw.strip.split(',').first
         kb.start_with?('KB') ? kb : "KB#{kb}"
+      end
+
+      def detect_search_error!(json)
+        return if json.nil? || json.empty?
+
+        data = JSON.parse(json)
+        return unless data.is_a?(Hash) && data.key?('Error')
+
+        raise Connection::CommandError, "WU search failed: #{data['Error']}"
+      rescue JSON::ParserError
+        nil
       end
 
       def validate_result!(result, operation)

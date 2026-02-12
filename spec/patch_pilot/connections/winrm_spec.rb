@@ -35,6 +35,20 @@ RSpec.describe PatchPilot::Connections::WinRM do
       )
       expect(conn.port).to eq(5986)
     end
+
+    it 'defaults operation_timeout to 60' do
+      expect(connection.operation_timeout).to eq(60)
+    end
+
+    it 'allows custom operation_timeout' do
+      conn = described_class.new(
+        host: '192.168.1.10',
+        username: 'admin',
+        password: 'secret',
+        operation_timeout: 300
+      )
+      expect(conn.operation_timeout).to eq(300)
+    end
   end
 
   describe '#connect' do
@@ -62,6 +76,20 @@ RSpec.describe PatchPilot::Connections::WinRM do
       connection.connect
       expect(WinRM::Connection).to have_received(:new).with(
         hash_including(user: 'CORP\\admin')
+      )
+    end
+
+    it 'sets operation_timeout in connection options' do
+      connection.connect
+      expect(WinRM::Connection).to have_received(:new).with(
+        hash_including(operation_timeout: 60)
+      )
+    end
+
+    it 'sets receive_timeout higher than operation_timeout' do
+      connection.connect
+      expect(WinRM::Connection).to have_received(:new).with(
+        hash_including(receive_timeout: 70, operation_timeout: 60)
       )
     end
 

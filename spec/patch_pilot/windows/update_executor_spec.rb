@@ -137,6 +137,18 @@ RSpec.describe PatchPilot::Windows::UpdateExecutor do
           .to raise_error(PatchPilot::Connection::CommandError, /update search failed/)
       end
     end
+
+    context 'when search returns an error in result JSON' do
+      before do
+        allow(connection).to receive(:execute)
+          .and_return(result(stdout: '{"Error":"Access is denied."}'))
+      end
+
+      it 'raises Connection::CommandError with the error message' do
+        expect { executor.available_updates }
+          .to raise_error(PatchPilot::Connection::CommandError, /WU search failed.*Access is denied/)
+      end
+    end
   end
 
   describe '#download_updates' do

@@ -75,3 +75,64 @@ export interface HealthResponse {
   status: string;
   timestamp: string;
 }
+
+// Available update (Windows - not yet installed)
+export interface AvailableUpdate {
+  kb_number: string;
+  title: string;
+  size_bytes: number;
+  size_mb: number | null;
+  severity: string;
+  is_downloaded: boolean;
+  categories: string[];
+}
+
+export interface AvailableUpdatesResponse {
+  asset: string;
+  available_updates: AvailableUpdate[];
+  summary: {
+    total: number;
+    security: number;
+    downloaded: number;
+  };
+  reboot_pending?: boolean;
+}
+
+// Installation result (Windows)
+export interface UpdateActionResult {
+  kb_number: string;
+  title: string;
+  result: string;
+  succeeded: boolean;
+}
+
+export interface InstallUpdatesResponse {
+  asset: string;
+  result: string;
+  succeeded: boolean;
+  reboot_required: boolean;
+  update_count: number;
+  updates: UpdateActionResult[];
+}
+
+// Upgrade result (Linux)
+export interface UpgradeResponse {
+  asset: string;
+  succeeded: boolean;
+  upgraded_count: number;
+  upgraded_packages: string[];
+  error?: string;
+}
+
+// Reboot status and action
+export interface RebootStatusResponse {
+  asset: string;
+  reboot_required: boolean;
+  deep_freeze?: boolean;
+}
+
+export interface RebootResponse {
+  asset: string;
+  rebooting: boolean;
+  deep_freeze?: boolean;
+}

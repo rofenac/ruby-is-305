@@ -127,7 +127,7 @@ RSpec.describe PatchPilot::Linux::DnfExecutor do
     it 'constructs command with package names' do
       executor.upgrade_packages(packages: %w[vim-enhanced openssl])
       expect(connection).to have_received(:execute)
-        .with('dnf upgrade -y vim-enhanced openssl 2>&1')
+        .with('sudo dnf upgrade -y vim-enhanced openssl 2>&1')
     end
   end
 

@@ -7,7 +7,7 @@ module PatchPilot
     # Execute package upgrades on DNF-based systems (Fedora, RHEL, CentOS).
     # Uses dnf with -y flag to avoid confirmation prompts.
     class DnfExecutor
-      UPGRADE_ALL_COMMAND = 'dnf upgrade -y 2>&1'
+      UPGRADE_ALL_COMMAND = 'sudo dnf upgrade -y 2>&1'
 
       attr_reader :connection
 
@@ -34,7 +34,7 @@ module PatchPilot
       # @raise [Connection::CommandError] if command execution fails
       def upgrade_packages(packages:)
         names = packages.join(' ')
-        command = "dnf upgrade -y #{names} 2>&1"
+        command = "sudo dnf upgrade -y #{names} 2>&1"
         result = connection.execute(command)
         parse_upgrade_result(result)
       end

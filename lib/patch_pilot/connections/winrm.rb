@@ -7,11 +7,12 @@ module PatchPilot
   module Connections
     # WinRM connection for remote command execution on Windows systems.
     # Uses Windows Remote Management protocol over HTTP/HTTPS.
-    class WinRM
+    class WinRM # rubocop:disable Metrics/ClassLength
       CONNECT_TIMEOUT = 10
       DEFAULT_PORT = 5985
+      DEFAULT_OPERATION_TIMEOUT = 60
 
-      attr_reader :host, :username, :domain, :port
+      attr_reader :host, :username, :domain, :port, :operation_timeout
 
       # Initialize a new WinRM connection
       #
@@ -20,12 +21,17 @@ module PatchPilot
       # @param password [String] password for authentication
       # @param domain [String, nil] Windows domain (optional)
       # @param port [Integer] WinRM port (default: 5985 for HTTP)
-      def initialize(host:, username:, password:, domain: nil, port: DEFAULT_PORT)
+      # @param operation_timeout [Integer] seconds for WinRM commands (default: 60)
+      # rubocop:disable Metrics/ParameterLists
+      def initialize(host:, username:, password:, domain: nil, port: DEFAULT_PORT,
+                     operation_timeout: DEFAULT_OPERATION_TIMEOUT)
+        # rubocop:enable Metrics/ParameterLists
         @host = host
         @username = username
         @password = password
         @domain = domain
         @port = port
+        @operation_timeout = operation_timeout
         @connection = nil
         @shell = nil
       end
@@ -118,9 +124,9 @@ module PatchPilot
           user: full_username,
           password: @password,
           transport: :negotiate,
-          open_timeout: 10,        # 10 second timeout for TCP connect
-          receive_timeout: 10,     # 10 second timeout for receiving data
-          operation_timeout: 30    # 30 second timeout for commands
+          open_timeout: 10,
+          receive_timeout: @operation_timeout + 10,
+          operation_timeout: @operation_timeout
         }
       end
 

@@ -2,20 +2,57 @@
 
 ---
 
-# NEXT: Frontend Integration for Execution Modules
+# NEXT: Verify available updates + reboot guard end-to-end
 
-Wire UpdateExecutor and PackageExecutor into the Sinatra API and React dashboard.
+Test via the dashboard:
+1. Available updates fix on Windows endpoints (timeout + SYSTEM task wrapper)
+2. Reboot pending guard — DC1 (pending reboot) should show "Reboot to finalize" instead of install button
 
-- [ ] Add `POST /api/assets/:name/updates/install` endpoint (Windows)
-- [ ] Add `POST /api/assets/:name/packages/upgrade` endpoint (Linux)
-- [ ] Add `GET /api/assets/:name/reboot-status` endpoint
-- [ ] Add `POST /api/assets/:name/reboot` endpoint
-- [ ] Frontend controls: install/upgrade buttons, reboot prompts, progress display
-- [ ] Goal: all backend functionality accessible from the dashboard
+## Backlog
+- End-to-end integration testing against lab environment
+- Scheduled/automated patch runs
+- Reporting and history tracking
+- Add update `title` field from COM API to installed updates display
 
 ---
 
 # Completed
+
+## Reboot Pending Guard (2026-02-12)
+- `GET /api/assets/:name/updates/available` now includes `reboot_pending` boolean (uses same connection, no extra overhead)
+- `POST /api/assets/:name/updates/install` returns 409 if reboot is pending (safety net)
+- `POST /api/assets/:name/packages/upgrade` returns 409 if reboot is pending (Linux parity)
+- Frontend: replaces "Install All Updates" button with "Reboot to finalize" warning when `reboot_pending` is true
+- Also triggers reboot status section visibility via `onRebootRequired()` callback
+- 297 RSpec tests passing, RuboCop clean, frontend builds clean
+
+## Available Updates Fix — Timeouts + SYSTEM Task Wrapper (2026-02-12)
+- **Root cause 1**: WinRM `receive_timeout` (10s) was shorter than `operation_timeout` (30s) — HTTP client killed connections before the server could respond. Any command >10s failed silently returning empty. Fixed: `operation_timeout` now configurable (default 60s), `receive_timeout` always set to `operation_timeout + 10`.
+- **Root cause 2**: WinRM "network" logon token gets `E_ACCESSDENIED` (0x80070005) from WU COM API `Search()` when there are actual pending updates. Fixed: `available_updates` now uses the same scheduled task wrapper as install — runs the search as SYSTEM with full privileges.
+- Refactored `build_task_wrapper` to accept `task_name:` keyword — reusable for both `Search` and `Install` operations with separate temp file paths
+- Added `detect_search_error!` to surface inner script errors from the task wrapper result JSON
+- Manual RDP test confirmed the search works interactively (12 seconds, 3 updates found on PC3)
+- 293 RSpec tests passing, RuboCop clean
+
+## Linux sudo + Windows Query/Executor Fixes (2026-02-11)
+- Linux executors: added `sudo` prefix to all upgrade commands (apt-get, dnf)
+- Windows UpdateQuery: combined `Get-HotFix` (CBS baseline) + `QueryHistory()` (WUA supplement) for complete installed update coverage
+- Windows UpdateExecutor: added `ServerSelection = 2` to all COM API searchers — forces Windows Update online, bypassing WSUS Group Policy on domain-joined machines
+- JSON output replaces CSV parsing; `description` derived from update categories
+- 288 RSpec tests passing, RuboCop clean
+
+## Windows/Linux Execution Layers (2026-02-11)
+- 5 new API endpoints: available updates, install updates, upgrade packages, reboot status, reboot
+- `GET /api/assets/:name/updates/available` — Windows available update search via COM API
+- `POST /api/assets/:name/updates/install` — install Windows updates (all or specific KBs)
+- `POST /api/assets/:name/packages/upgrade` — upgrade Linux packages (all or specific)
+- `GET /api/assets/:name/reboot-status` — check reboot pending (Windows + Linux)
+- `POST /api/assets/:name/reboot` — trigger reboot with connection-drop handling
+- React dashboard: check available updates, install/upgrade with confirmation, progress display
+- Deep Freeze guard: 409 on install/reboot for `deep_freeze: true` assets; frontend hides execution UI
+- Scheduled task wrapper for Windows Update install (WinRM non-interactive sessions can't call `IUpdateInstaller.Install`)
+- Reboot status section with explicit reboot trigger
+- 286 RSpec tests passing, RuboCop clean, frontend builds clean
 
 ## Linux Package Execution Module (2026-02-10)
 - `PatchPilot::Linux::PackageExecutor` factory with `AptExecutor` and `DnfExecutor` implementations

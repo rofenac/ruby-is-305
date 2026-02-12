@@ -129,10 +129,10 @@ RSpec.describe PatchPilot::Linux::AptExecutor do
         .with(a_string_including('--only-upgrade libssl3 openssl'))
     end
 
-    it 'uses DEBIAN_FRONTEND=noninteractive' do
+    it 'uses sudo with DEBIAN_FRONTEND=noninteractive' do
       executor.upgrade_packages(packages: %w[libssl3 openssl])
       expect(connection).to have_received(:execute)
-        .with(a_string_starting_with('DEBIAN_FRONTEND=noninteractive'))
+        .with(a_string_starting_with('sudo DEBIAN_FRONTEND=noninteractive'))
     end
   end
 

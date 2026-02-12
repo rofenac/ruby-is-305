@@ -7,7 +7,7 @@ module PatchPilot
     # Execute package upgrades on APT-based systems (Debian, Ubuntu, Kali).
     # Uses apt-get with non-interactive mode to avoid confirmation prompts.
     class AptExecutor
-      UPGRADE_ALL_COMMAND = 'DEBIAN_FRONTEND=noninteractive apt-get upgrade -y 2>&1'
+      UPGRADE_ALL_COMMAND = 'sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y 2>&1'
       REBOOT_CHECK_COMMAND = 'test -f /var/run/reboot-required && echo true || echo false'
 
       attr_reader :connection
@@ -35,7 +35,7 @@ module PatchPilot
       # @raise [Connection::CommandError] if command execution fails
       def upgrade_packages(packages:)
         names = packages.join(' ')
-        command = "DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade #{names} 2>&1"
+        command = "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade #{names} 2>&1"
         result = connection.execute(command)
         parse_upgrade_result(result)
       end

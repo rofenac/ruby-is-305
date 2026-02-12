@@ -7,18 +7,21 @@ RSpec.describe PatchPilot::Windows::UpdateQuery do
   let(:connection) { instance_double(PatchPilot::Connections::WinRM) }
   let(:query) { described_class.new(connection) }
 
-  let(:sample_csv_output) do
-    <<~CSV
-      "HotFixID","Description","InstalledOn","InstalledBy"
-      "KB5066131","Update","12/6/2025 12:00:00 AM",""
-      "KB5073379","Security Update","1/14/2026 12:00:00 AM","NT AUTHORITY\\SYSTEM"
-      "KB5072725","Security Update","1/14/2026 12:00:00 AM","NT AUTHORITY\\SYSTEM"
-      "KB5071142","Update","12/6/2025 12:00:00 AM",""
-    CSV
+  let(:sample_json_output) do
+    [
+      { 'KBArticleIDs' => '5066131', 'Description' => 'Update',
+        'InstalledOn' => '12/6/2025 12:00:00 AM' },
+      { 'KBArticleIDs' => '5073379', 'Description' => 'Security Update',
+        'InstalledOn' => '1/14/2026 12:00:00 AM' },
+      { 'KBArticleIDs' => '5072725', 'Description' => 'Security Update',
+        'InstalledOn' => '1/14/2026 12:00:00 AM' },
+      { 'KBArticleIDs' => '5071142', 'Description' => 'Update',
+        'InstalledOn' => '12/6/2025 12:00:00 AM' }
+    ].to_json
   end
 
   let(:command_result) do
-    PatchPilot::Connection::Result.new(stdout: sample_csv_output, stderr: '', exit_code: 0)
+    PatchPilot::Connection::Result.new(stdout: sample_json_output, stderr: '', exit_code: 0)
   end
 
   before do
@@ -48,10 +51,9 @@ RSpec.describe PatchPilot::Windows::UpdateQuery do
       expect(updates[1].installed_on).to eq(Date.new(2026, 1, 14))
     end
 
-    it 'parses installed_by correctly' do
+    it 'sets installed_by to nil for COM API results' do
       updates = query.installed_updates
-      expect(updates[0].installed_by).to be_nil
-      expect(updates[1].installed_by).to eq('NT AUTHORITY\\SYSTEM')
+      expect(updates.map(&:installed_by)).to all(be_nil)
     end
 
     it 'caches results' do
@@ -73,6 +75,30 @@ RSpec.describe PatchPilot::Windows::UpdateQuery do
 
       it 'returns empty array' do
         expect(query.installed_updates).to eq([])
+      end
+    end
+
+    context 'with empty JSON array' do
+      let(:command_result) do
+        PatchPilot::Connection::Result.new(stdout: '[]', stderr: '', exit_code: 0)
+      end
+
+      it 'returns empty array' do
+        expect(query.installed_updates).to eq([])
+      end
+    end
+
+    context 'with single update (non-array JSON)' do
+      let(:command_result) do
+        single = { 'KBArticleIDs' => '5073379', 'Description' => 'Security Update',
+                   'InstalledOn' => '1/14/2026 12:00:00 AM' }.to_json
+        PatchPilot::Connection::Result.new(stdout: single, stderr: '', exit_code: 0)
+      end
+
+      it 'wraps single result in array' do
+        updates = query.installed_updates
+        expect(updates.size).to eq(1)
+        expect(updates.first.kb_number).to eq('KB5073379')
       end
     end
   end
@@ -126,17 +152,19 @@ RSpec.describe PatchPilot::Windows::UpdateQuery do
     let(:other_connection) { instance_double(PatchPilot::Connections::WinRM) }
     let(:other_query) { described_class.new(other_connection) }
 
-    let(:other_csv_output) do
-      <<~CSV
-        "HotFixID","Description","InstalledOn","InstalledBy"
-        "KB5066131","Update","12/6/2025 12:00:00 AM",""
-        "KB5073379","Security Update","1/14/2026 12:00:00 AM","NT AUTHORITY\\SYSTEM"
-        "KB9999999","Update","1/20/2026 12:00:00 AM",""
-      CSV
+    let(:other_json_output) do
+      [
+        { 'KBArticleIDs' => '5066131', 'Description' => 'Update',
+          'InstalledOn' => '12/6/2025 12:00:00 AM' },
+        { 'KBArticleIDs' => '5073379', 'Description' => 'Security Update',
+          'InstalledOn' => '1/14/2026 12:00:00 AM' },
+        { 'KBArticleIDs' => '9999999', 'Description' => 'Update',
+          'InstalledOn' => '1/20/2026 12:00:00 AM' }
+      ].to_json
     end
 
     before do
-      other_result = PatchPilot::Connection::Result.new(stdout: other_csv_output, stderr: '', exit_code: 0)
+      other_result = PatchPilot::Connection::Result.new(stdout: other_json_output, stderr: '', exit_code: 0)
       allow(other_connection).to receive(:execute).and_return(other_result)
     end
 
@@ -172,7 +200,7 @@ RSpec.describe PatchPilot::Windows::Update do
       kb_number: 'KB5073379',
       description: 'Security Update',
       installed_on: Date.new(2026, 1, 14),
-      installed_by: 'NT AUTHORITY\\SYSTEM'
+      installed_by: nil
     )
   end
 

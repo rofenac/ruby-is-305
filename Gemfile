@@ -18,5 +18,6 @@ gem 'sinatra', '~> 4.0'
 gem 'sinatra-contrib', '~> 4.0'
 gem 'sinatra-cross_origin', '~> 0.4'
 
+gem 'rack-test', '~> 2.1', group: :development
 gem 'rspec', '~> 3.13', group: :development
 gem 'rubocop', '~> 1.82', group: :development
