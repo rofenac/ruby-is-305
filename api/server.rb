@@ -6,9 +6,11 @@ require 'sinatra/json'
 require 'sinatra/cross_origin'
 require_relative '../lib/patch_pilot'
 
-# Enable CORS for development
+# Enable CORS and allow all origins (lab subnet access)
 configure do
   enable :cross_origin
+  set :protection, false
+  set :bind, '0.0.0.0'
 end
 
 before do
