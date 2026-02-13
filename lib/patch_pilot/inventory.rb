@@ -26,6 +26,11 @@ module PatchPilot
     #
     # @param data [Hash] parsed YAML data
     def initialize(data)
+      unless data.is_a?(Hash)
+        raise Error, 'Invalid inventory format: expected a YAML mapping with "credentials" and "assets" keys. ' \
+                     'See config/inventory.yml.example'
+      end
+
       @credentials = data.fetch('credentials', {})
       @assets = data.fetch('assets', []).map { |attrs| Asset.new(attrs) }
     end
