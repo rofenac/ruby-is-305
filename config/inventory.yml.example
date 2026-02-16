@@ -9,10 +9,12 @@ credentials:
   windows_domain:
     type: winrm
     username: ${DOMAIN_ADMIN_USER}
+    password: ${DOMAIN_ADMIN_PASSWORD}
     domain: ${DOMAIN_NAME}
   linux_ssh:
     type: ssh
     username: ${SSH_USER}
+    password: ${SSH_PASSWORD}
     key_file: ~/.ssh/lab_key
 
 # Managed assets
