@@ -2,6 +2,10 @@ AllCops:
   TargetRubyVersion: 3.3
   NewCops: enable
 
+# Keyword arguments don't contribute to complexity the same way positional args do
+Metrics/ParameterLists:
+  CountKeywordArgs: false
+
 # RSpec blocks are expected to be longer
 Metrics/BlockLength:
   Exclude:

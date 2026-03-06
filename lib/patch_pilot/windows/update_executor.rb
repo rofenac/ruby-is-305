@@ -6,7 +6,7 @@ module PatchPilot
   module Windows
     # Represents an available (not yet installed) Windows update
     AvailableUpdate = Struct.new(:kb_number, :title, :size_bytes, :severity,
-                                 :is_downloaded, :categories, keyword_init: true) do
+                                 :is_downloaded, :categories) do
       # Check if the update has already been downloaded
       #
       # @return [Boolean]
@@ -32,8 +32,7 @@ module PatchPilot
     end
 
     # Represents the per-update result of a download or install action
-    UpdateActionResult = Struct.new(:kb_number, :title, :result_code, :result_text,
-                                    keyword_init: true) do
+    UpdateActionResult = Struct.new(:kb_number, :title, :result_code, :result_text) do
       # Check if this individual update action succeeded
       #
       # @return [Boolean]
@@ -44,7 +43,7 @@ module PatchPilot
 
     # Represents the overall result of a download or install operation
     InstallationResult = Struct.new(:result_code, :result_text, :reboot_required,
-                                    :update_count, :updates, keyword_init: true) do
+                                    :update_count, :updates) do
       # Check if the overall operation succeeded (includes partial success)
       #
       # @return [Boolean]

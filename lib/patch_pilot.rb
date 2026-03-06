@@ -6,6 +6,16 @@
 # heterogeneous Windows and Linux environments.
 module PatchPilot
   class Error < StandardError; end
+
+  class << self
+    def load_inventory(path = default_inventory_path)
+      Inventory.load(path)
+    end
+
+    def default_inventory_path
+      File.expand_path('../config/inventory.yml', __dir__)
+    end
+  end
 end
 
 require_relative 'patch_pilot/credential_resolver'
@@ -16,22 +26,3 @@ require_relative 'patch_pilot/windows/update_query'
 require_relative 'patch_pilot/windows/update_executor'
 require_relative 'patch_pilot/linux/package_query'
 require_relative 'patch_pilot/linux/package_executor'
-
-module PatchPilot # rubocop:disable Style/Documentation
-  class << self
-    # Load inventory from the default or specified path
-    #
-    # @param path [String] path to inventory YAML file
-    # @return [Inventory] loaded inventory instance
-    def load_inventory(path = default_inventory_path)
-      Inventory.load(path)
-    end
-
-    # Default path to inventory configuration
-    #
-    # @return [String] path to default inventory file
-    def default_inventory_path
-      File.expand_path('../config/inventory.yml', __dir__)
-    end
-  end
-end

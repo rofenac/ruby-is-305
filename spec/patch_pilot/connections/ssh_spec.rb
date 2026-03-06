@@ -153,6 +153,44 @@ RSpec.describe PatchPilot::Connections::SSH do
       expect(result.stdout).to eq("fedora-ws\n")
     end
 
+    context 'with sudo_password set' do
+      subject(:connection) do
+        described_class.new(
+          host: '192.168.1.30',
+          username: 'admin',
+          password: 'secret',
+          sudo_password: 'sudopass'
+        )
+      end
+
+      it 'rewrites sudo commands to pipe the password via sudo -S' do
+        connection.connect
+        connection.execute('sudo apt-get upgrade -y')
+        expect(mock_channel).to have_received(:exec)
+          .with("echo 'sudopass' | sudo -S -p '' apt-get upgrade -y")
+      end
+
+      it 'leaves non-sudo commands unchanged' do
+        connection.connect
+        connection.execute('echo test')
+        expect(mock_channel).to have_received(:exec).with('echo test')
+      end
+
+      it 'escapes single quotes in the sudo password' do
+        conn = described_class.new(
+          host: '192.168.1.30',
+          username: 'admin',
+          password: 'secret',
+          sudo_password: "it's-a-pass"
+        )
+        allow(Net::SSH).to receive(:start).and_return(mock_session)
+        conn.connect
+        conn.execute('sudo dnf upgrade -y')
+        expect(mock_channel).to have_received(:exec)
+          .with("echo 'it'\\''s-a-pass' | sudo -S -p '' dnf upgrade -y")
+      end
+    end
+
     context 'when command execution fails' do
       before do
         allow(mock_channel).to receive(:exec).and_yield(mock_channel, false)
@@ -162,6 +200,31 @@ RSpec.describe PatchPilot::Connections::SSH do
         connection.connect
         expect { connection.execute('bad-command') }
           .to raise_error(PatchPilot::Connection::CommandError, /Failed to execute/)
+      end
+    end
+
+    context 'when connection is dead (ECONNRESET)' do
+      let(:fresh_session) { instance_double(Net::SSH::Connection::Session, closed?: false) }
+
+      before do
+        allow(mock_session).to receive(:loop).and_raise(Errno::ECONNRESET)
+        allow(Net::SSH).to receive(:start).and_return(mock_session, fresh_session)
+        allow(fresh_session).to receive(:open_channel).and_yield(mock_channel)
+        allow(fresh_session).to receive(:loop)
+      end
+
+      it 'resets the session and retries on a fresh connection' do
+        connection.connect
+        result = connection.execute('echo test')
+        expect(result.stdout).to eq("fedora-ws\n")
+        expect(Net::SSH).to have_received(:start).twice
+      end
+
+      it 'raises CommandError if the retry also fails' do
+        allow(fresh_session).to receive(:loop).and_raise(Errno::ECONNRESET)
+        connection.connect
+        expect { connection.execute('echo test') }
+          .to raise_error(PatchPilot::Connection::CommandError, /after reconnect/)
       end
     end
   end

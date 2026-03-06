@@ -11,7 +11,7 @@ RSpec.describe PatchPilot::Inventory do
       let(:inventory_path) { File.expand_path('../../config/inventory.yml', __dir__) }
 
       it 'loads all assets' do
-        expect(inventory.count).to eq(8)
+        expect(inventory.count).to eq(34)
       end
 
       it 'loads credentials' do
@@ -37,22 +37,22 @@ RSpec.describe PatchPilot::Inventory do
     describe '#windows' do
       it 'returns only Windows assets' do
         expect(inventory.windows).to all(be_windows)
-        expect(inventory.windows.count).to eq(5)
+        expect(inventory.windows.count).to eq(30)
       end
     end
 
     describe '#linux' do
       it 'returns only Linux assets' do
         expect(inventory.linux).to all(be_linux)
-        expect(inventory.linux.count).to eq(3)
+        expect(inventory.linux.count).to eq(4)
       end
     end
 
     describe '#deep_freeze_enabled' do
       it 'returns only Deep Freeze assets' do
         df_assets = inventory.deep_freeze_enabled
-        expect(df_assets.count).to eq(1)
-        expect(df_assets.first.hostname).to eq('PC1')
+        expect(df_assets.count).to eq(24)
+        expect(df_assets.first.hostname).to eq('T215-01')
       end
     end
 
@@ -69,21 +69,21 @@ RSpec.describe PatchPilot::Inventory do
       it 'returns Docker hosts' do
         docker = inventory.docker_hosts
         expect(docker.count).to eq(1)
-        expect(docker.first.hostname).to eq('docker')
+        expect(docker.first.hostname).to eq('prod-docker')
       end
     end
 
     describe '#by_tag' do
       it 'filters by tag' do
         infrastructure = inventory.by_tag('infrastructure')
-        expect(infrastructure.count).to eq(2)
+        expect(infrastructure.count).to eq(4)
       end
     end
 
     describe '#by_role' do
       it 'filters by role' do
         endpoints = inventory.by_role('endpoint')
-        expect(endpoints.count).to eq(3)
+        expect(endpoints.count).to eq(26)
       end
     end
 
@@ -133,10 +133,10 @@ RSpec.describe PatchPilot::Inventory do
 
     it 'returns summary string' do
       summary = inventory.summary
-      expect(summary).to include('Total assets: 8')
-      expect(summary).to include('Windows: 5')
-      expect(summary).to include('Linux: 3')
-      expect(summary).to include('Deep Freeze enabled: 1')
+      expect(summary).to include('Total assets: 34')
+      expect(summary).to include('Windows: 30')
+      expect(summary).to include('Linux: 4')
+      expect(summary).to include('Deep Freeze enabled: 24')
     end
   end
 end

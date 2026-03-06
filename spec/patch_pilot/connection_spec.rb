@@ -91,5 +91,27 @@ RSpec.describe PatchPilot::Connection do
       expect(connection.host).to eq('192.168.1.20')
       expect(connection.username).to eq('root')
     end
+
+    it 'uses default SSH port 22 for plain IP' do
+      connection = described_class.for(linux_asset, ssh_credentials)
+      expect(connection.port).to eq(22)
+    end
+
+    context 'when ip contains host:port (PAT traversal)' do
+      let(:pat_asset) do
+        PatchPilot::Asset.new(
+          'hostname' => 'SB3',
+          'ip' => '192.168.0.254:9000',
+          'os' => 'linux',
+          'tags' => []
+        )
+      end
+
+      it 'splits host and port correctly' do
+        connection = described_class.for(pat_asset, ssh_credentials)
+        expect(connection.host).to eq('192.168.0.254')
+        expect(connection.port).to eq(9000)
+      end
+    end
   end
 end

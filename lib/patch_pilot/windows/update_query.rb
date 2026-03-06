@@ -6,7 +6,7 @@ require 'date'
 module PatchPilot
   module Windows
     # Represents a single installed Windows update
-    Update = Struct.new(:kb_number, :description, :installed_on, :installed_by, keyword_init: true) do
+    Update = Struct.new(:kb_number, :description, :installed_on, :installed_by) do
       # Check if this is a security update
       #
       # @return [Boolean]

@@ -3,7 +3,7 @@
 module PatchPilot
   module Linux
     # Represents a Linux package with its metadata
-    Package = Struct.new(:name, :version, :architecture, :status, keyword_init: true) do
+    Package = Struct.new(:name, :version, :architecture, :status) do
       # Check if this package has an upgrade available
       #
       # @return [Boolean]

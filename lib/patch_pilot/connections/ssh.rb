@@ -18,12 +18,14 @@ module PatchPilot
       # @param key_file [String, nil] path to SSH private key (optional)
       # @param password [String, nil] password for authentication (optional)
       # @param port [Integer] SSH port (default: 22)
-      def initialize(host:, username:, key_file: nil, password: nil, port: DEFAULT_PORT)
+      # @param sudo_password [String, nil] password to pipe into sudo -S (optional)
+      def initialize(host:, username:, key_file: nil, password: nil, port: DEFAULT_PORT, sudo_password: nil)
         @host = host
         @username = username
         @key_file = expand_key_file(key_file)
         @password = password
         @port = port
+        @sudo_password = sudo_password
         @session = nil
       end
 
@@ -50,10 +52,13 @@ module PatchPilot
       # @raise [Connection::CommandError] if command execution fails
       def execute(command)
         ensure_connected
-        output = run_command(command)
+        output = run_command(inject_sudo_password(command))
         Connection::Result.new(stdout: output[:stdout], stderr: output[:stderr], exit_code: output[:exit_code] || 0)
       rescue Net::SSH::Exception => e
         raise Connection::CommandError, "Command execution failed: #{e.message}"
+      rescue Errno::ECONNRESET, Errno::EPIPE, IOError => e
+        @session = nil
+        retry_execute(inject_sudo_password(command), e)
       end
 
       # Close the connection and release resources
@@ -77,7 +82,9 @@ module PatchPilot
         {
           port: port,
           non_interactive: true,
-          timeout: 10 # Connection timeout in seconds
+          timeout: 10,
+          keepalive: true,
+          keepalive_interval: 30
         }.merge(auth_options)
       end
 
@@ -89,6 +96,21 @@ module PatchPilot
         else
           {}
         end
+      end
+
+      def retry_execute(command, original_error)
+        connect
+        output = run_command(command)
+        Connection::Result.new(stdout: output[:stdout], stderr: output[:stderr], exit_code: output[:exit_code] || 0)
+      rescue StandardError
+        raise Connection::CommandError, "Command execution failed after reconnect: #{original_error.message}"
+      end
+
+      def inject_sudo_password(command)
+        return command unless @sudo_password && command.start_with?('sudo ')
+
+        escaped = @sudo_password.gsub("'") { "'\\''" }
+        "echo '#{escaped}' | sudo -S -p '' #{command[5..]}"
       end
 
       def expand_key_file(path)

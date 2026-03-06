@@ -13,6 +13,7 @@ Test via the dashboard:
 - Scheduled/automated patch runs
 - Reporting and history tracking
 - Add update `title` field from COM API to installed updates display
+- SSH command execution timeout: `session.loop` blocks indefinitely if a host goes unresponsive mid-command (e.g. SB4 hang). Add configurable per-credential timeout so hung commands fail cleanly. Use a generous default (30+ min) to avoid false timeouts on large upgrades like SB3's 600-package run.
 
 ---
 

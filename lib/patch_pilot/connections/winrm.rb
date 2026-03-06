@@ -22,10 +22,8 @@ module PatchPilot
       # @param domain [String, nil] Windows domain (optional)
       # @param port [Integer] WinRM port (default: 5985 for HTTP)
       # @param operation_timeout [Integer] seconds for WinRM commands (default: 60)
-      # rubocop:disable Metrics/ParameterLists
       def initialize(host:, username:, password:, domain: nil, port: DEFAULT_PORT,
                      operation_timeout: DEFAULT_OPERATION_TIMEOUT)
-        # rubocop:enable Metrics/ParameterLists
         @host = host
         @username = username
         @password = password

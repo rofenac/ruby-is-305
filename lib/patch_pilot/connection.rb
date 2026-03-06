@@ -5,7 +5,7 @@ module PatchPilot
   # and defines the common interface and exceptions for all connection types.
   module Connection
     # Result of executing a remote command
-    Result = Struct.new(:stdout, :stderr, :exit_code, keyword_init: true) do
+    Result = Struct.new(:stdout, :stderr, :exit_code) do
       def success?
         exit_code.zero?
       end
@@ -57,12 +57,22 @@ module PatchPilot
 
       def build_ssh_connection(asset, credentials)
         require_relative 'connections/ssh'
+        host, port = split_host_port(asset.ip, Connections::SSH::DEFAULT_PORT)
         Connections::SSH.new(
-          host: asset.ip,
+          host: host,
           username: credentials['username'],
           key_file: credentials['key_file'],
-          password: credentials['password']
+          password: credentials['password'],
+          port: port,
+          sudo_password: credentials['sudo_password']
         )
+      end
+
+      def split_host_port(ip, default_port)
+        return [ip, default_port] unless ip.include?(':')
+
+        host, port_str = ip.split(':', 2)
+        [host, port_str.to_i]
       end
     end
   end

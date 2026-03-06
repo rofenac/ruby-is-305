@@ -4,7 +4,7 @@ module PatchPilot
   module Linux
     # Represents the result of a package upgrade operation
     UpgradeResult = Struct.new(:success, :upgraded_count, :upgraded_packages,
-                               :stdout, :stderr, keyword_init: true) do
+                               :stdout, :stderr) do
       # Check if the upgrade completed successfully
       #
       # @return [Boolean]
