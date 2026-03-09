@@ -97,6 +97,24 @@ RSpec.describe PatchPilot::Connection do
       expect(connection.port).to eq(22)
     end
 
+    context 'when asset has explicit port field (PAT traversal)' do
+      let(:pat_asset_port_field) do
+        PatchPilot::Asset.new(
+          'hostname' => 'sb3',
+          'ip' => '192.168.0.254',
+          'port' => 6013,
+          'os' => 'linux',
+          'tags' => []
+        )
+      end
+
+      it 'uses the port field for SSH connection' do
+        connection = described_class.for(pat_asset_port_field, ssh_credentials)
+        expect(connection.host).to eq('192.168.0.254')
+        expect(connection.port).to eq(6013)
+      end
+    end
+
     context 'when ip contains host:port (PAT traversal)' do
       let(:pat_asset) do
         PatchPilot::Asset.new(

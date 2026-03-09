@@ -15,7 +15,6 @@ credentials:
     type: ssh
     username: ${SSH_USER}
     password: ${SSH_PASSWORD}
-    key_file: ~/.ssh/lab_key
 
 # Managed assets
 assets:

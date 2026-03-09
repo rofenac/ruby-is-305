@@ -11,7 +11,7 @@ RSpec.describe PatchPilot::Inventory do
       let(:inventory_path) { File.expand_path('../../config/inventory.yml', __dir__) }
 
       it 'loads all assets' do
-        expect(inventory.count).to eq(34)
+        expect(inventory.count).to eq(38)
       end
 
       it 'loads credentials' do
@@ -37,7 +37,7 @@ RSpec.describe PatchPilot::Inventory do
     describe '#windows' do
       it 'returns only Windows assets' do
         expect(inventory.windows).to all(be_windows)
-        expect(inventory.windows.count).to eq(30)
+        expect(inventory.windows.count).to eq(34)
       end
     end
 
@@ -52,14 +52,14 @@ RSpec.describe PatchPilot::Inventory do
       it 'returns only Deep Freeze assets' do
         df_assets = inventory.deep_freeze_enabled
         expect(df_assets.count).to eq(24)
-        expect(df_assets.first.hostname).to eq('T215-01')
+        expect(df_assets.first.hostname).to eq('t215-01')
       end
     end
 
     describe '#control_endpoints' do
       it 'returns Windows endpoints without Deep Freeze' do
         controls = inventory.control_endpoints
-        expect(controls.count).to eq(2)
+        expect(controls.count).to eq(4)
         expect(controls).to all(be_windows)
         expect(controls.map(&:deep_freeze?)).to all(be false)
       end
@@ -83,13 +83,13 @@ RSpec.describe PatchPilot::Inventory do
     describe '#by_role' do
       it 'filters by role' do
         endpoints = inventory.by_role('endpoint')
-        expect(endpoints.count).to eq(26)
+        expect(endpoints.count).to eq(28)
       end
     end
 
     describe '#find' do
       it 'finds asset by hostname' do
-        asset = inventory.find('DC1')
+        asset = inventory.find('dc1')
         expect(asset).not_to be_nil
         expect(asset.role).to eq('domain_controller')
       end
@@ -133,8 +133,8 @@ RSpec.describe PatchPilot::Inventory do
 
     it 'returns summary string' do
       summary = inventory.summary
-      expect(summary).to include('Total assets: 34')
-      expect(summary).to include('Windows: 30')
+      expect(summary).to include('Total assets: 38')
+      expect(summary).to include('Windows: 34')
       expect(summary).to include('Linux: 4')
       expect(summary).to include('Deep Freeze enabled: 24')
     end

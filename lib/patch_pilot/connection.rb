@@ -57,7 +57,8 @@ module PatchPilot
 
       def build_ssh_connection(asset, credentials)
         require_relative 'connections/ssh'
-        host, port = split_host_port(asset.ip, Connections::SSH::DEFAULT_PORT)
+        default_port = asset.attributes['port'] || Connections::SSH::DEFAULT_PORT
+        host, port = split_host_port(asset.ip, default_port)
         Connections::SSH.new(
           host: host,
           username: credentials['username'],

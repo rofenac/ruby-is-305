@@ -13,7 +13,8 @@ Test via the dashboard:
 - Scheduled/automated patch runs
 - Reporting and history tracking
 - Add update `title` field from COM API to installed updates display
-- SSH command execution timeout: `session.loop` blocks indefinitely if a host goes unresponsive mid-command (e.g. SB4 hang). Add configurable per-credential timeout so hung commands fail cleanly. Use a generous default (30+ min) to avoid false timeouts on large upgrades like SB3's 600-package run.
+- **SB4 intermittent comms loss** (recurring): host drops mid-session. `session.loop` blocks indefinitely when a host goes unresponsive — need a configurable per-credential command timeout so hung sessions fail cleanly instead of hanging forever.
+- **SB3 partial upgrade stall** (recurring): installs most packages but consistently stops with ~10 remaining. Retrying the upgrade fails (likely a lock file or partial dpkg state). Need to investigate root cause — possibly a post-install script hanging, a held package, or a dpkg lock not being released. A timeout on `session.loop` (see above) would also help surface this failure cleanly.
 
 ---
 

@@ -8,9 +8,9 @@ PatchPilot remotely queries, compares, and orchestrates patch management across 
 
 ## Prerequisites
 
-These instructions assume a fresh Ubuntu Server install. Adapt package manager commands if you're on a different distro.
-
 ### System packages
+
+#### Debian / Ubuntu
 
 ```bash
 sudo apt update
@@ -18,19 +18,52 @@ sudo apt install -y build-essential libssl-dev libz-dev autoconf bison \
   curl git libgdbm-dev libncurses5-dev libreadline-dev libffi-dev libyaml-dev
 ```
 
-### Ruby 3.3.6 (via rbenv)
-
-Ubuntu's default repos do not ship Ruby 3.3.x. Install via [rbenv](https://github.com/rbenv/rbenv):
+#### Arch Linux
 
 ```bash
-# Install rbenv and ruby-build
+sudo pacman -Syu
+sudo pacman -S --needed base-devel openssl zlib autoconf bison \
+  curl git gdbm ncurses readline libffi libyaml
+```
+
+### Ruby 3.3.6 (via rbenv)
+
+Neither Ubuntu's default repos nor Arch's system Ruby are guaranteed to ship Ruby 3.3.x. Use [rbenv](https://github.com/rbenv/rbenv) to pin the correct version.
+
+#### Debian / Ubuntu — install rbenv via the curl installer
+
+```bash
 curl -fsSL https://github.com/rbenv/rbenv-installer/raw/HEAD/bin/rbenv-installer | bash
 
-# Add rbenv to your shell (bash example — adjust for zsh if needed)
+# bash:
 echo 'eval "$(~/.rbenv/bin/rbenv init - bash)"' >> ~/.bashrc
 source ~/.bashrc
+# zsh:
+# echo 'eval "$(~/.rbenv/bin/rbenv init - zsh)"' >> ~/.zshrc
+# source ~/.zshrc
+```
 
-# Install Ruby 3.3.6
+#### Arch Linux — install rbenv via pacman
+
+```bash
+sudo pacman -S rbenv ruby-build
+
+# bash:
+echo 'eval "$(rbenv init - bash)"' >> ~/.bashrc
+source ~/.bashrc
+# zsh:
+# echo 'eval "$(rbenv init - zsh)"' >> ~/.zshrc
+# source ~/.zshrc
+```
+
+> **Note:** On Arch, `erb` is split into its own package and is required to build Ruby. Install it before running `rbenv install`:
+> ```bash
+> sudo pacman -S ruby-erb
+> ```
+
+#### All distros — install Ruby 3.3.6
+
+```bash
 rbenv install 3.3.6
 rbenv global 3.3.6
 
@@ -50,6 +83,8 @@ The Vite/React frontend requires Node.js. Install via [nvm](https://github.com/n
 
 ```bash
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+
+# Reload your shell config (adjust for zsh if needed)
 source ~/.bashrc
 
 nvm install 20
@@ -92,11 +127,21 @@ cp .env.example .env
 Edit `.env` with your actual credentials. The inventory references these variables for WinRM and SSH authentication:
 
 ```
-DOMAIN_ADMIN_USER=<your domain admin username>
-DOMAIN_ADMIN_PASSWORD=<your domain admin password>
-DOMAIN_NAME=<your domain name>
-SSH_USER=<your SSH username>
-SSH_PASSWORD=<your SSH password>
+DOMAIN_ADMIN_USER=<domain admin username>
+DOMAIN_ADMIN_PASSWORD=<domain admin password>
+DOMAIN_NAME=<domain name>
+
+SSH_USER=<SSH username for general lab Linux hosts>
+SSH_PASSWORD=<SSH password>
+SSH_SUDO_PASSWORD=<sudo password (may match SSH_PASSWORD)>
+
+PROD_DOCKER_SSH_USER=<prod-docker SSH username>
+PROD_DOCKER_SSH_PASSWORD=<prod-docker SSH password>
+PROD_DOCKER_SUDO_PASSWORD=<prod-docker sudo password>
+
+CIS1_SSH_USER=<cis1 SSH username>
+CIS1_SSH_PASSWORD=<cis1 SSH password>
+CIS1_SUDO_PASSWORD=<cis1 sudo password>
 ```
 
 ### 5. Configure the asset inventory
@@ -154,7 +199,8 @@ curl http://localhost:4567/api/health
 
 - Verify the target machine IPs in `config/inventory.yml` are reachable from your server (`ping <ip>`).
 - WinRM (Windows): Port 5985 must be open. WinRM must be enabled on the target (`winrm quickconfig`). The domain account needs admin privileges.
-- SSH (Linux): Port 22 must be open. Key-based auth is preferred (set `key_file` in inventory), with password fallback.
+- SSH (Linux): Port 22 must be open (sandbox hosts use custom ports via PAT — see `config/inventory.yml`). Password authentication is used; ensure `SSH_USER` and `SSH_PASSWORD` are set in `.env`.
+- **Tailscale**: must be disabled when connecting to the lab. It silently hijacks routing and breaks connections.
 - Check that `.env` credentials are correct and the variables match what `config/inventory.yml` references (`${DOMAIN_ADMIN_USER}`, etc.).
 
 ---
