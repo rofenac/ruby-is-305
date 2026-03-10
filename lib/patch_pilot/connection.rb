@@ -59,14 +59,10 @@ module PatchPilot
         require_relative 'connections/ssh'
         default_port = asset.attributes['port'] || Connections::SSH::DEFAULT_PORT
         host, port = split_host_port(asset.ip, default_port)
-        Connections::SSH.new(
-          host: host,
-          username: credentials['username'],
-          key_file: credentials['key_file'],
-          password: credentials['password'],
-          port: port,
-          sudo_password: credentials['sudo_password']
-        )
+        ssh_options = { host: host, port: port, username: credentials['username'],
+                        password: credentials['password'], key_file: credentials['key_file'],
+                        sudo_password: credentials['sudo_password'] }
+        Connections::SSH.new(**ssh_options)
       end
 
       def split_host_port(ip, default_port)
