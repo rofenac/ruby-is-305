@@ -1,0 +1,11 @@
+.env
+.git
+.gitignore
+node_modules
+tmp
+log
+coverage
+spec
+web-gui/node_modules
+web-gui/dist
+config/inventory.yml

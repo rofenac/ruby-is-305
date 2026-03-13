@@ -1,0 +1,20 @@
+services:
+  patchpilot:
+    image: patchpilot:latest
+    container_name: patchpilot
+    restart: unless-stopped
+    ports:
+      - "4567:4567"
+    env_file:
+      - .env
+    environment:
+      RACK_ENV: production
+      PATCHPILOT_AUTH_USERNAME: patchpilot
+      PATCHPILOT_AUTH_PASSWORD: change-me
+      PATCHPILOT_ALLOWED_CORS_CIDRS: 192.168.0.0/16
+      PATCHPILOT_INVENTORY_PATH: /var/lib/patchpilot/inventory.yml
+    volumes:
+      - patch_pilot:/var/lib/patchpilot
+
+volumes:
+  patch_pilot:

@@ -13,6 +13,9 @@ module PatchPilot
     end
 
     def default_inventory_path
+      inventory_path = ENV.fetch('PATCHPILOT_INVENTORY_PATH', nil)
+      return inventory_path unless inventory_path.to_s.empty?
+
       File.expand_path('../config/inventory.yml', __dir__)
     end
   end

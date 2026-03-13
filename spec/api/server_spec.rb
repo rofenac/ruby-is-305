@@ -70,6 +70,61 @@ RSpec.describe 'PatchPilot API - Execution Endpoints' do
       .with(ssh_conn, package_manager: 'apt').and_return(apt_executor)
   end
 
+  describe 'authentication and CORS' do
+    around do |example|
+      original_username = ENV.fetch('PATCHPILOT_AUTH_USERNAME', nil)
+      original_password = ENV.fetch('PATCHPILOT_AUTH_PASSWORD', nil)
+      original_cidrs = ENV.fetch('PATCHPILOT_ALLOWED_CORS_CIDRS', nil)
+
+      ENV['PATCHPILOT_AUTH_USERNAME'] = 'patchpilot'
+      ENV['PATCHPILOT_AUTH_PASSWORD'] = 'labpass'
+      ENV['PATCHPILOT_ALLOWED_CORS_CIDRS'] = '192.168.0.0/16'
+      example.run
+    ensure
+      ENV['PATCHPILOT_AUTH_USERNAME'] = original_username
+      ENV['PATCHPILOT_AUTH_PASSWORD'] = original_password
+      ENV['PATCHPILOT_ALLOWED_CORS_CIDRS'] = original_cidrs
+    end
+
+    it 'requires basic auth for API requests when configured' do
+      get '/api/inventory'
+      expect(last_response.status).to eq(401)
+      expect(last_response.headers['WWW-Authenticate']).to include('Basic')
+      body = JSON.parse(last_response.body)
+      expect(body['error']).to include('Authentication required')
+    end
+
+    it 'allows authenticated API requests' do
+      basic_authorize 'patchpilot', 'labpass'
+      get '/api/inventory'
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body['count']).to eq(2)
+    end
+
+    it 'keeps the health check public' do
+      get '/api/health'
+      expect(last_response.status).to eq(200)
+    end
+
+    it 'rejects requests from disallowed origins' do
+      basic_authorize 'patchpilot', 'labpass'
+      header 'Origin', 'http://10.0.0.5:5173'
+      get '/api/inventory'
+      expect(last_response.status).to eq(403)
+      body = JSON.parse(last_response.body)
+      expect(body['error']).to include('Origin not allowed')
+    end
+
+    it 'echoes allowed origins from the lab subnet' do
+      basic_authorize 'patchpilot', 'labpass'
+      header 'Origin', 'http://192.168.8.25:5173'
+      get '/api/inventory'
+      expect(last_response.status).to eq(200)
+      expect(last_response.headers['Access-Control-Allow-Origin']).to eq('http://192.168.8.25:5173')
+    end
+  end
+
   # --- GET /api/assets/:name/updates/available ---
 
   describe 'GET /api/assets/:name/updates/available' do

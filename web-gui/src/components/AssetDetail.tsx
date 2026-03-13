@@ -19,6 +19,17 @@ function isWindowsResponse(response: UpdatesResponse): response is WindowsUpdate
   return 'updates' in response;
 }
 
+function formatKbNumber(kbNumber: string | null): string {
+  return kbNumber ?? 'N/A';
+}
+
+function buildListKey(index: number, ...parts: Array<string | number | null | undefined>): string {
+  return parts
+    .map((part) => (part == null || part === '' ? 'missing' : String(part)))
+    .concat(String(index))
+    .join(':');
+}
+
 export function AssetDetail({ asset, onClose }: AssetDetailProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -354,10 +365,13 @@ function WindowsUpdatesList({ data, assetName, deepFreeze, onRebootRequired }: W
             </tr>
           </thead>
           <tbody>
-            {data.updates.map((update) => (
-              <tr key={update.kb_number} className="hover">
+            {data.updates.map((update, index) => (
+              <tr
+                key={buildListKey(index, update.kb_number, update.installed_on, update.description)}
+                className="hover"
+              >
                 <td>
-                  <code className="text-primary">{update.kb_number}</code>
+                  <code className="text-primary">{formatKbNumber(update.kb_number)}</code>
                 </td>
                 <td>{update.description}</td>
                 <td className="text-base-content/70">
@@ -436,9 +450,12 @@ function WindowsUpdatesList({ data, assetName, deepFreeze, onRebootRequired }: W
                     </tr>
                   </thead>
                   <tbody>
-                    {available.available_updates.map((update) => (
-                      <tr key={update.kb_number} className="hover">
-                        <td><code className="text-warning">{update.kb_number}</code></td>
+                    {available.available_updates.map((update, index) => (
+                      <tr
+                        key={buildListKey(index, update.kb_number, update.title, update.severity)}
+                        className="hover"
+                      >
+                        <td><code className="text-warning">{formatKbNumber(update.kb_number)}</code></td>
                         <td className="max-w-xs truncate">{update.title}</td>
                         <td className="text-base-content/70">
                           {update.size_mb ? `${update.size_mb} MB` : 'Unknown'}
@@ -519,9 +536,12 @@ function WindowsUpdatesList({ data, assetName, deepFreeze, onRebootRequired }: W
                   </tr>
                 </thead>
                 <tbody>
-                  {installResult.updates.map((u) => (
-                    <tr key={u.kb_number} className="hover">
-                      <td><code className="text-primary">{u.kb_number}</code></td>
+                  {installResult.updates.map((u, index) => (
+                    <tr
+                      key={buildListKey(index, u.kb_number, u.title, u.result)}
+                      className="hover"
+                    >
+                      <td><code className="text-primary">{formatKbNumber(u.kb_number)}</code></td>
                       <td>{u.title}</td>
                       <td>
                         <span className={`badge badge-sm ${u.succeeded ? 'badge-success' : 'badge-error'}`}>
@@ -632,8 +652,8 @@ function LinuxPackagesList({ data, assetName, onRebootRequired }: LinuxPackagesL
                 </tr>
               </thead>
               <tbody>
-                {data.packages.upgradable.map((pkg) => (
-                  <tr key={pkg.name} className="hover">
+                {data.packages.upgradable.map((pkg, index) => (
+                  <tr key={buildListKey(index, pkg.name, pkg.version, pkg.architecture)} className="hover">
                     <td>
                       <code className="text-warning">{pkg.name}</code>
                     </td>
@@ -711,8 +731,8 @@ function LinuxPackagesList({ data, assetName, onRebootRequired }: LinuxPackagesL
 
           {upgradeResult.upgraded_packages.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {upgradeResult.upgraded_packages.map((pkg) => (
-                <span key={pkg} className="badge badge-success badge-outline">{pkg}</span>
+              {upgradeResult.upgraded_packages.map((pkg, index) => (
+                <span key={buildListKey(index, pkg)} className="badge badge-success badge-outline">{pkg}</span>
               ))}
             </div>
           )}

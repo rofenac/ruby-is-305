@@ -19,7 +19,7 @@ export interface AssetStatus {
 }
 
 export interface WindowsUpdate {
-  kb_number: string;
+  kb_number: string | null;
   description: string;
   installed_on: string | null;
   installed_by: string | null;
@@ -78,7 +78,7 @@ export interface HealthResponse {
 
 // Available update (Windows - not yet installed)
 export interface AvailableUpdate {
-  kb_number: string;
+  kb_number: string | null;
   title: string;
   size_bytes: number;
   size_mb: number | null;
@@ -100,7 +100,7 @@ export interface AvailableUpdatesResponse {
 
 // Installation result (Windows)
 export interface UpdateActionResult {
-  kb_number: string;
+  kb_number: string | null;
   title: string;
   result: string;
   succeeded: boolean;

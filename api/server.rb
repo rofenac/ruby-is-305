@@ -1,31 +1,130 @@
 # frozen_string_literal: true
 
 require 'dotenv/load'
+require 'ipaddr'
+require 'rack/utils'
 require 'sinatra'
 require 'sinatra/json'
-require 'sinatra/cross_origin'
+require 'uri'
 require_relative '../lib/patch_pilot'
 
-# Enable CORS and allow all origins (lab subnet access)
 configure do
-  enable :cross_origin
-  set :protection, false
-  set :bind, '0.0.0.0'
+  set :bind, ENV.fetch('PATCHPILOT_BIND', '0.0.0.0')
+  set :server, :puma
+  set :public_folder, File.expand_path('../web-gui/dist', __dir__)
+  set :static, File.directory?(settings.public_folder)
 end
 
 before do
-  response.headers['Access-Control-Allow-Origin'] = '*'
-  content_type :json
+  apply_cors_headers! if api_request?
+  enforce_basic_auth!
+  content_type :json if api_request?
 end
 
 options '*' do
-  response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-  response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+  apply_cors_headers!
   200
 end
 
 # rubocop:disable Metrics/BlockLength
 helpers do
+  def api_request?
+    request.path_info.start_with?('/api/')
+  end
+
+  def expected_auth_username
+    ENV.fetch('PATCHPILOT_AUTH_USERNAME', '')
+  end
+
+  def expected_auth_password
+    ENV.fetch('PATCHPILOT_AUTH_PASSWORD', '')
+  end
+
+  def basic_auth_enabled?
+    !expected_auth_username.empty? && !expected_auth_password.empty?
+  end
+
+  def public_path?
+    request.options? || request.path_info == '/api/health'
+  end
+
+  def enforce_basic_auth!
+    return unless basic_auth_enabled?
+    return if public_path?
+    return if authorized?
+
+    response['WWW-Authenticate'] = 'Basic realm="PatchPilot"'
+    halt(*unauthorized_response)
+  end
+
+  def authorized?
+    auth = Rack::Auth::Basic::Request.new(request.env)
+    return false unless auth.provided? && auth.basic? && auth.credentials&.length == 2
+
+    username, password = auth.credentials
+    secure_compare(username, expected_auth_username) &&
+      secure_compare(password, expected_auth_password)
+  end
+
+  def secure_compare(left, right)
+    return false unless left.bytesize == right.bytesize
+
+    Rack::Utils.secure_compare(left, right)
+  end
+
+  def unauthorized_response
+    if api_request?
+      [401, { error: 'Authentication required' }.to_json]
+    else
+      [401, 'Authentication required']
+    end
+  end
+
+  def allowed_cors_cidrs
+    ENV.fetch('PATCHPILOT_ALLOWED_CORS_CIDRS', '192.168.0.0/16,127.0.0.1/32,::1/128')
+       .split(',')
+       .map(&:strip)
+       .reject(&:empty?)
+       .map { |cidr| IPAddr.new(cidr) }
+  end
+
+  def cors_origin_allowed?(origin)
+    return false if origin.to_s.empty?
+
+    uri = URI.parse(origin)
+    host = uri.host
+    return false if host.nil?
+    return true if host == request.host
+    return true if %w[localhost].include?(host)
+
+    address = IPAddr.new(host)
+    allowed_cors_cidrs.any? { |cidr| cidr.include?(address) }
+  rescue URI::InvalidURIError, IPAddr::InvalidAddressError
+    false
+  end
+
+  def apply_cors_headers!
+    origin = request_origin
+    return if origin.to_s.empty?
+
+    halt 403, { error: 'Origin not allowed' }.to_json unless cors_origin_allowed?(origin)
+
+    response.headers.merge!(cors_headers(origin))
+  end
+
+  def request_origin
+    request.env['HTTP_ORIGIN']
+  end
+
+  def cors_headers(origin)
+    {
+      'Access-Control-Allow-Origin' => origin,
+      'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers' => 'Authorization, Content-Type',
+      'Vary' => 'Origin'
+    }
+  end
+
   def inventory
     @inventory ||= PatchPilot.load_inventory
   end
@@ -148,6 +247,14 @@ helpers do
              upgraded_packages: result.upgraded_packages }
     hash[:error] = result.stderr unless result.succeeded? || result.stderr.to_s.empty?
     hash
+  end
+
+  def frontend_available?
+    File.exist?(frontend_index_path)
+  end
+
+  def frontend_index_path
+    File.join(settings.public_folder, 'index.html')
   end
 end
 # rubocop:enable Metrics/BlockLength
@@ -340,4 +447,10 @@ post '/api/assets/:name/reboot' do
     rescue StandardError # rubocop:disable Lint/SuppressedException
     end
   end
+end
+
+get '/' do
+  halt 404, 'Frontend build not found' unless frontend_available?
+
+  send_file frontend_index_path
 end
