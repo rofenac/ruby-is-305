@@ -276,7 +276,8 @@ cd web-gui && npm run dev
 
 | Endpoint | Description |
 |---|---|
-| `GET /api/health` | Health check |
+| `GET /api/health` | Health check (public — no auth required) |
+| `GET /api/auth/verify` | Validate credentials — returns 200 or 401 |
 | `GET /api/inventory` | List all assets (includes `os_version`, `role`, `tags`) |
 | `GET /api/assets/:name` | Get asset details (includes `os_version`, `role`, `tags`) |
 | `GET /api/assets/:name/status` | Check if asset is online |
@@ -290,11 +291,14 @@ cd web-gui && npm run dev
 
 ### Testing the API Directly
 
+Auth is required for all endpoints except `/api/health`. Set `PATCHPILOT_AUTH_USERNAME` and `PATCHPILOT_AUTH_PASSWORD` in docker-compose or `.env`, then pass credentials with `-u`:
+
 ```bash
 curl http://localhost:4567/api/health
-curl http://localhost:4567/api/inventory
-curl http://localhost:4567/api/assets/dc1
-curl "http://localhost:4567/api/compare?asset1=t215-01&asset2=t215-25"
+curl -u patchpilot:change-me http://localhost:4567/api/auth/verify
+curl -u patchpilot:change-me http://localhost:4567/api/inventory
+curl -u patchpilot:change-me http://localhost:4567/api/assets/dc1
+curl -u patchpilot:change-me "http://localhost:4567/api/compare?asset1=t215-01&asset2=t215-25"
 ```
 
 ## Running Automated Tests

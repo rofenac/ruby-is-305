@@ -450,6 +450,11 @@ post '/api/assets/:name/reboot' do
   end
 end
 
+# Verify authentication (used by frontend login flow)
+get '/api/auth/verify' do
+  json authenticated: true
+end
+
 get '/' do
   halt 404, 'Frontend build not found' unless frontend_available?
 

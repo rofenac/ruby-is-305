@@ -20,6 +20,14 @@ Test via the dashboard:
 
 # Completed
 
+## Frontend Login Page + Logout (2026-03-16)
+- `GET /api/auth/verify` endpoint added to backend (protected by existing basic auth)
+- `client.ts`: credentials stored as `Basic <base64>` in `sessionStorage`; all fetch/post calls include `Authorization` header; 401 throws `'Unauthorized'`
+- `LoginPage.tsx`: centered card with username/password form, GSAP slide-in, error state on bad creds
+- `Navbar.tsx`: Sign Out button (arrow icon, red on hover) added to navbar-end
+- `App.tsx`: `isAuthenticated` state gates entire app; tab refresh doesn't require re-login; any API 401 auto-logs out
+- Credentials still configured via `PATCHPILOT_AUTH_USERNAME` / `PATCHPILOT_AUTH_PASSWORD` in docker-compose
+
 ## Dashboard Subsections + Brand Icons (2026-03-16)
 - `asset_to_hash` now exposes `os_version`, `role`, and `tags` in the inventory API response
 - `Asset` TypeScript interface updated with `os_version`, `role`, `tags` fields

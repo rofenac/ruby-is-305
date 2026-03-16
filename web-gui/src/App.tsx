@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 import './index.css';
-import { Navbar, Dashboard, AssetDetail, CompareView } from './components';
-import { getHealth, getInventory } from './api/client';
+import { Navbar, Dashboard, AssetDetail, CompareView, LoginPage } from './components';
+import { getHealth, getInventory, hasCredentials, clearCredentials } from './api/client';
 import type { Asset, InventoryResponse } from './types';
 
 // Register GSAP
@@ -13,6 +13,7 @@ type View = 'dashboard' | 'compare';
 type ApiStatus = 'connected' | 'disconnected' | 'checking';
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(hasCredentials);
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [apiStatus, setApiStatus] = useState<ApiStatus>('checking');
   const [inventory, setInventory] = useState<InventoryResponse | null>(null);
@@ -20,17 +21,26 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
 
+  const handleLogout = useCallback(() => {
+    clearCredentials();
+    setIsAuthenticated(false);
+    setInventory(null);
+    setSelectedAsset(null);
+    setCurrentView('dashboard');
+  }, []);
+
   const checkApiHealth = useCallback(async () => {
     setApiStatus('checking');
     try {
       await getHealth();
       setApiStatus('connected');
       return true;
-    } catch {
+    } catch (e) {
+      if ((e as Error).message === 'Unauthorized') handleLogout();
       setApiStatus('disconnected');
       return false;
     }
-  }, []);
+  }, [handleLogout]);
 
   const loadInventory = useCallback(async () => {
     setLoading(true);
@@ -39,12 +49,18 @@ function App() {
       const data = await getInventory();
       setInventory(data);
     } catch (e) {
+      if ((e as Error).message === 'Unauthorized') {
+        handleLogout();
+        return;
+      }
       setError((e as Error).message);
     }
     setLoading(false);
-  }, []);
+  }, [handleLogout]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const init = async () => {
       const healthy = await checkApiHealth();
       if (healthy) {
@@ -59,12 +75,16 @@ function App() {
     // Periodic health check
     const interval = setInterval(checkApiHealth, 30000);
     return () => clearInterval(interval);
-  }, [checkApiHealth, loadInventory]);
+  }, [isAuthenticated, checkApiHealth, loadInventory]);
 
   const handleRefresh = async () => {
     await checkApiHealth();
     await loadInventory();
   };
+
+  if (!isAuthenticated) {
+    return <LoginPage onLogin={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-base-300 via-base-300 to-base-200">
@@ -80,6 +100,7 @@ function App() {
           onNavigate={setCurrentView}
           currentView={currentView}
           apiStatus={apiStatus}
+          onLogout={handleLogout}
         />
 
         <main>

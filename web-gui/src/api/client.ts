@@ -13,14 +13,38 @@ import type {
 } from '../types';
 
 const API_BASE = '/api';
+const AUTH_KEY = 'patchpilot_auth';
+
+export function setCredentials(username: string, password: string): void {
+  sessionStorage.setItem(AUTH_KEY, btoa(`${username}:${password}`));
+}
+
+export function clearCredentials(): void {
+  sessionStorage.removeItem(AUTH_KEY);
+}
+
+export function hasCredentials(): boolean {
+  return !!sessionStorage.getItem(AUTH_KEY);
+}
+
+function authHeaders(): Record<string, string> {
+  const token = sessionStorage.getItem(AUTH_KEY);
+  return token ? { Authorization: `Basic ${token}` } : {};
+}
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: authHeaders() });
+  if (response.status === 401) throw new Error('Unauthorized');
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
   return response.json();
+}
+
+export async function verifyAuth(): Promise<boolean> {
+  const response = await fetch(`${API_BASE}/auth/verify`, { headers: authHeaders() });
+  return response.ok;
 }
 
 export async function getHealth(): Promise<HealthResponse> {
@@ -51,9 +75,10 @@ export async function compareAssets(asset1: string, asset2: string): Promise<Com
 async function postJson<T>(url: string, body?: unknown): Promise<T> {
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (response.status === 401) throw new Error('Unauthorized');
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
     throw new Error(error.error || `HTTP ${response.status}`);
