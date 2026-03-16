@@ -3,6 +3,7 @@ import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import type { Asset, AssetStatus } from '../types';
 import { getAssetStatus } from '../api/client';
+import { OsIcon } from '../utils/osIcon';
 
 interface AssetCardProps {
   asset: Asset;
@@ -108,7 +109,6 @@ export function AssetCard({ asset, index, onSelect }: AssetCardProps) {
   };
 
   const isWindows = asset.os.toLowerCase().includes('windows');
-  const osIcon = isWindows ? '🪟' : '🐧';
 
   return (
     <div
@@ -121,7 +121,9 @@ export function AssetCard({ asset, index, onSelect }: AssetCardProps) {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <span ref={iconRef} className="text-4xl">{osIcon}</span>
+            <span ref={iconRef} className="flex items-center justify-center">
+              <OsIcon asset={asset} size={40} />
+            </span>
             <div>
               <h2 className="card-title text-lg">{asset.name}</h2>
               <p className="text-sm text-base-content/60">{asset.ip}</p>

@@ -2,9 +2,12 @@ export interface Asset {
   name: string;
   ip: string;
   os: string;
+  os_version?: string;
   credential_id: string;
   deep_freeze: boolean;
   package_manager?: string;
+  role?: string;
+  tags?: string[];
 }
 
 export interface InventoryResponse {

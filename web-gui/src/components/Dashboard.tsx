@@ -3,6 +3,7 @@ import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import type { Asset, InventoryResponse } from '../types';
 import { AssetCard } from './AssetCard';
+import { WindowsIcon, LinuxIcon } from '../utils/osIcon';
 
 interface DashboardProps {
   inventory: InventoryResponse | null;
@@ -12,12 +13,44 @@ interface DashboardProps {
   onRefresh: () => void;
 }
 
+interface SubsectionProps {
+  title: string;
+  icon: string;
+  badgeClass: string;
+  assets: Asset[];
+  indexOffset: number;
+  onSelect: (asset: Asset) => void;
+  accentClass: string;
+}
+
+function AssetSubsection({ title, icon, badgeClass, assets, indexOffset, onSelect, accentClass }: SubsectionProps) {
+  if (assets.length === 0) return null;
+  return (
+    <div className={`mb-6 pl-4 border-l-2 ${accentClass}`}>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-lg">{icon}</span>
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-base-content/60">{title}</h3>
+        <div className={`badge badge-sm ${badgeClass}`}>{assets.length}</div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {assets.map((asset, i) => (
+          <AssetCard
+            key={asset.name}
+            asset={asset}
+            index={indexOffset + i}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Dashboard({ inventory, loading, error, onSelectAsset, onRefresh }: DashboardProps) {
   const headerRef = useRef<HTMLDivElement>(null);
   const statsRef = useRef<HTMLDivElement>(null);
 
   useGSAP(() => {
-    // Wait for next frame to ensure DOM is painted
     requestAnimationFrame(() => {
       if (headerRef.current) {
         gsap.fromTo(headerRef.current,
@@ -72,13 +105,44 @@ export function Dashboard({ inventory, loading, error, onSelectAsset, onRefresh 
 
   if (!inventory) return null;
 
-  const windowsAssets = inventory.assets.filter((a) =>
-    a.os.toLowerCase().includes('windows')
+  // Top-level OS split
+  const windowsServers      = inventory.assets.filter(a => a.os === 'windows_server');
+  const windowsWorkstations = inventory.assets.filter(a => a.os === 'windows_desktop');
+  const linuxAssets         = inventory.assets.filter(a => !a.os.toLowerCase().includes('windows'));
+  const deepFreezeAssets    = inventory.assets.filter(a => a.deep_freeze);
+
+  // Server subsections
+  const domainControllers = windowsServers.filter(a => a.role === 'domain_controller');
+  const memberServers     = windowsServers.filter(a => a.role === 'member_server');
+  const otherServers      = windowsServers.filter(
+    a => !['domain_controller', 'member_server'].includes(a.role ?? '')
   );
-  const linuxAssets = inventory.assets.filter((a) =>
-    !a.os.toLowerCase().includes('windows')
+
+  // Workstation subsections
+  const teacherWorkstations = windowsWorkstations.filter(a => a.role === 'teacher_workstation');
+  const labWorkstations     = windowsWorkstations.filter(a => a.role === 'endpoint');
+  const hotSpares           = windowsWorkstations.filter(a => a.role === 'hot_spare');
+  const nmwsWorkstations    = windowsWorkstations.filter(a => a.role === 'monitoring_workstation');
+  const otherWorkstations   = windowsWorkstations.filter(
+    a => !['teacher_workstation', 'endpoint', 'hot_spare', 'monitoring_workstation'].includes(a.role ?? '')
   );
-  const deepFreezeAssets = inventory.assets.filter((a) => a.deep_freeze);
+
+  // Pre-compute index offsets for GSAP stagger continuity across subsections
+  const offsets = (() => {
+    let i = 0;
+    const next = (n: number) => { const o = i; i += n; return o; };
+    return {
+      domainControllers:  next(domainControllers.length),
+      memberServers:      next(memberServers.length),
+      otherServers:       next(otherServers.length),
+      teacherWorkstations: next(teacherWorkstations.length),
+      labWorkstations:    next(labWorkstations.length),
+      hotSpares:          next(hotSpares.length),
+      nmwsWorkstations:   next(nmwsWorkstations.length),
+      otherWorkstations:  next(otherWorkstations.length),
+      linux:              next(linuxAssets.length),
+    };
+  })();
 
   return (
     <div className="container mx-auto px-6 py-8">
@@ -110,15 +174,15 @@ export function Dashboard({ inventory, loading, error, onSelectAsset, onRefresh 
 
         <div className="stat bg-base-100/50 backdrop-blur-sm rounded-box border border-base-content/10">
           <div className="stat-figure text-info">
-            <span className="text-3xl">🪟</span>
+            <WindowsIcon size={30} />
           </div>
           <div className="stat-title">Windows</div>
-          <div className="stat-value text-info">{windowsAssets.length}</div>
+          <div className="stat-value text-info">{windowsServers.length + windowsWorkstations.length}</div>
         </div>
 
         <div className="stat bg-base-100/50 backdrop-blur-sm rounded-box border border-base-content/10">
           <div className="stat-figure text-warning">
-            <span className="text-3xl">🐧</span>
+            <LinuxIcon size={30} />
           </div>
           <div className="stat-title">Linux</div>
           <div className="stat-value text-warning">{linuxAssets.length}</div>
@@ -133,23 +197,100 @@ export function Dashboard({ inventory, loading, error, onSelectAsset, onRefresh 
         </div>
       </div>
 
-      {/* Windows Section */}
-      {windowsAssets.length > 0 && (
+      {/* Windows Servers */}
+      {windowsServers.length > 0 && (
         <section className="mb-10">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-2xl">🪟</span>
-            <h2 className="text-xl font-semibold">Windows Systems</h2>
-            <div className="badge badge-info">{windowsAssets.length}</div>
+          <div className="flex items-center gap-3 mb-5">
+            <WindowsIcon size={26} />
+            <h2 className="text-xl font-semibold">Windows Servers</h2>
+            <div className="badge badge-error">{windowsServers.length}</div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {windowsAssets.map((asset, index) => (
-              <AssetCard
-                key={asset.name}
-                asset={asset}
-                index={index}
-                onSelect={onSelectAsset}
-              />
-            ))}
+          <div className="flex flex-col gap-1">
+            <AssetSubsection
+              title="Domain Controllers"
+              icon="👑"
+              badgeClass="badge-error"
+              accentClass="border-error/40"
+              assets={domainControllers}
+              indexOffset={offsets.domainControllers}
+              onSelect={onSelectAsset}
+            />
+            <AssetSubsection
+              title="Member Servers"
+              icon="🗄️"
+              badgeClass="badge-warning"
+              accentClass="border-warning/40"
+              assets={memberServers}
+              indexOffset={offsets.memberServers}
+              onSelect={onSelectAsset}
+            />
+            <AssetSubsection
+              title="Other Servers"
+              icon="🖥️"
+              badgeClass="badge-neutral"
+              accentClass="border-neutral/40"
+              assets={otherServers}
+              indexOffset={offsets.otherServers}
+              onSelect={onSelectAsset}
+            />
+          </div>
+        </section>
+      )}
+
+      {/* Windows Workstations */}
+      {windowsWorkstations.length > 0 && (
+        <section className="mb-10">
+          <div className="flex items-center gap-3 mb-5">
+            <WindowsIcon size={26} />
+            <h2 className="text-xl font-semibold">Windows Workstations</h2>
+            <div className="badge badge-info">{windowsWorkstations.length}</div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <AssetSubsection
+              title="Teacher's Workstation"
+              icon="🎓"
+              badgeClass="badge-secondary"
+              accentClass="border-secondary/40"
+              assets={teacherWorkstations}
+              indexOffset={offsets.teacherWorkstations}
+              onSelect={onSelectAsset}
+            />
+            <AssetSubsection
+              title="Lab Workstations"
+              icon="💻"
+              badgeClass="badge-info"
+              accentClass="border-info/40"
+              assets={labWorkstations}
+              indexOffset={offsets.labWorkstations}
+              onSelect={onSelectAsset}
+            />
+            <AssetSubsection
+              title="Hot Spares"
+              icon="🔥"
+              badgeClass="badge-warning"
+              accentClass="border-warning/40"
+              assets={hotSpares}
+              indexOffset={offsets.hotSpares}
+              onSelect={onSelectAsset}
+            />
+            <AssetSubsection
+              title="Network Monitoring Workstations"
+              icon="📡"
+              badgeClass="badge-accent"
+              accentClass="border-accent/40"
+              assets={nmwsWorkstations}
+              indexOffset={offsets.nmwsWorkstations}
+              onSelect={onSelectAsset}
+            />
+            <AssetSubsection
+              title="Other Workstations"
+              icon="🪟"
+              badgeClass="badge-neutral"
+              accentClass="border-neutral/40"
+              assets={otherWorkstations}
+              indexOffset={offsets.otherWorkstations}
+              onSelect={onSelectAsset}
+            />
           </div>
         </section>
       )}
@@ -158,16 +299,16 @@ export function Dashboard({ inventory, loading, error, onSelectAsset, onRefresh 
       {linuxAssets.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-4">
-            <span className="text-2xl">🐧</span>
+            <LinuxIcon size={26} />
             <h2 className="text-xl font-semibold">Linux Systems</h2>
             <div className="badge badge-warning">{linuxAssets.length}</div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {linuxAssets.map((asset, index) => (
+            {linuxAssets.map((asset, i) => (
               <AssetCard
                 key={asset.name}
                 asset={asset}
-                index={index + windowsAssets.length}
+                index={offsets.linux + i}
                 onSelect={onSelectAsset}
               />
             ))}

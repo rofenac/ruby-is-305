@@ -146,8 +146,9 @@ helpers do
   end
 
   def asset_to_hash(asset)
-    { name: asset.hostname, ip: asset.ip, os: asset.os, credential_id: asset.credential_ref,
-      deep_freeze: asset.deep_freeze?, package_manager: asset.package_manager }
+    { name: asset.hostname, ip: asset.ip, os: asset.os, os_version: asset.os_version,
+      credential_id: asset.credential_ref, deep_freeze: asset.deep_freeze?,
+      package_manager: asset.package_manager, role: asset.role, tags: asset.tags }
   end
 
   def update_to_hash(update)

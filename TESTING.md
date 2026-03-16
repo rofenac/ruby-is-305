@@ -17,21 +17,21 @@ export $(grep -v '^#' .env | xargs) && bundle exec ruby bin/test_connection.rb <
 
 ### Available Hosts
 
-| Hostname | IP | OS | Notes |
-|---|---|---|---|
-| `dc1` | 192.168.1.0 | Windows Server 2016 | Domain Controller |
-| `dc4` | 192.168.1.4 | Windows Server 2019 | Domain Controller |
-| `dm4` | 192.168.1.30 | Windows Server 2022 | Member Server |
-| `hyperv1` | 192.168.1.100 | Windows Server 2025 | Hyper-V Host |
-| `cis1` | 192.168.1.60 | RHEL | Linux server (cis1 creds) |
-| `prod-docker` | 192.168.1.101 | Ubuntu | Docker host (prod_docker creds) |
-| `t215-01`..`t215-24` | 192.168.8.1–.24 | Windows 11 | Student endpoints, Deep Freeze ON |
-| `t215-25` | 192.168.8.25 | Windows 11 | Teaching workstation |
-| `workstation01`..`03` | 192.168.8.26–.28 | Windows 11 | Hot spares |
-| `t215-nmws` | 192.168.11.1 | Windows 11 | Network monitoring (primary) |
-| `t215b-nmws` | 192.168.11.2 | Windows 11 | Network monitoring (backup) |
-| `sb3` | 192.168.0.254:6013 | Kali | Sandbox via PAT (linux_ssh creds) |
-| `sb4` | 192.168.0.254:6014 | Fedora Security | Sandbox via PAT (linux_ssh creds) |
+| Hostname | IP | OS | Role | Notes |
+|---|---|---|---|---|
+| `dc1` | 192.168.1.0 | Windows Server 2016 | `domain_controller` | |
+| `dc4` | 192.168.1.4 | Windows Server 2019 | `domain_controller` | |
+| `dm4` | 192.168.1.30 | Windows Server 2022 | `member_server` | |
+| `hyperv1` | 192.168.1.100 | Windows Server 2025 | `member_server` | Hyper-V host |
+| `cis1` | 192.168.1.60 | RHEL | `server` | Linux server (cis1 creds) |
+| `prod-docker` | 192.168.1.101 | Ubuntu | `docker_host` | Docker host (prod_docker creds) |
+| `t215-01`..`t215-24` | 192.168.8.1–.24 | Windows 11 | `endpoint` | Student endpoints, Deep Freeze ON |
+| `t215-25` | 192.168.8.25 | Windows 11 | `teacher_workstation` | No Deep Freeze |
+| `t215-26`..`t215-28` | 192.168.8.26–.28 | Windows 11 | `hot_spare` | No Deep Freeze |
+| `t215-nmws` | 192.168.11.1 | Windows 11 | `monitoring_workstation` | Network monitoring (primary) |
+| `t215b-nmws` | 192.168.11.2 | Windows 11 | `monitoring_workstation` | Network monitoring (backup) |
+| `sb3` | 192.168.0.254:6013 | Kali | `sandbox` | Via PAT (linux_ssh creds) |
+| `sb4` | 192.168.0.254:6014 | Fedora Security | `sandbox` | Via PAT (linux_ssh creds) |
 
 ### Examples
 
@@ -183,7 +183,7 @@ bundle exec irb -r ./lib/patch_pilot -r dotenv/load
 ```ruby
 inv = PatchPilot.load_inventory
 
-# Use a control endpoint (no Deep Freeze) — t215-25 or workstation01..03
+# Use a control endpoint (no Deep Freeze) — t215-25 (teacher) or t215-26..28 (hot spares)
 asset = inv.find('t215-25')
 conn = asset.connect(inv)
 conn.connect
@@ -277,8 +277,8 @@ cd web-gui && npm run dev
 | Endpoint | Description |
 |---|---|
 | `GET /api/health` | Health check |
-| `GET /api/inventory` | List all assets |
-| `GET /api/assets/:name` | Get asset details |
+| `GET /api/inventory` | List all assets (includes `os_version`, `role`, `tags`) |
+| `GET /api/assets/:name` | Get asset details (includes `os_version`, `role`, `tags`) |
 | `GET /api/assets/:name/status` | Check if asset is online |
 | `GET /api/assets/:name/updates` | Get updates (Windows) or packages (Linux) |
 | `GET /api/assets/:name/updates/available` | Search available updates |

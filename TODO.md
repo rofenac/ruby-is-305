@@ -20,6 +20,20 @@ Test via the dashboard:
 
 # Completed
 
+## Dashboard Subsections + Brand Icons (2026-03-16)
+- `asset_to_hash` now exposes `os_version`, `role`, and `tags` in the inventory API response
+- `Asset` TypeScript interface updated with `os_version`, `role`, `tags` fields
+- Dashboard restructured: "Windows Systems" replaced with separate **Windows Servers** and **Windows Workstations** top-level sections
+- Windows Servers subsections: Domain Controllers (👑), Member Servers (🗄️)
+- Windows Workstations subsections: Teacher's Workstation (🎓), Lab Workstations (💻), Hot Spares (🔥), NMWSes (📡)
+- `inventory.yml`: t215-25 → `role: teacher_workstation`; t215-26/27/28 → `role: hot_spare`
+- Installed `react-icons`; created `src/utils/osIcon.tsx` as single source of truth for OS → icon + color mapping
+- Classic 4-color Windows flag SVG (inline, no dependency) replaces 🪟 everywhere
+- Linux distro icons with brand colors: RHEL (`#EE0000`), Kali (`#367BF0`), Fedora (`#51A2DA`), Ubuntu (`#E95420`), Docker (`#2496ED`), generic Linux (`#FCC624`)
+- GSAP stagger continuity preserved across subsections via pre-computed index offsets
+
+# Completed (prior)
+
 ## Reboot Pending Guard (2026-02-12)
 - `GET /api/assets/:name/updates/available` now includes `reboot_pending` boolean (uses same connection, no extra overhead)
 - `POST /api/assets/:name/updates/install` returns 409 if reboot is pending (safety net)
