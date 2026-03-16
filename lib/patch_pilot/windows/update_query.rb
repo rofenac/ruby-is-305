@@ -6,7 +6,7 @@ require 'date'
 module PatchPilot
   module Windows
     # Represents a single installed Windows update
-    Update = Struct.new(:kb_number, :description, :installed_on, :installed_by) do
+    Update = Struct.new(:kb_number, :description, :installed_on, :installed_by, :title) do
       # Check if this is a security update
       #
       # @return [Boolean]
@@ -89,19 +89,27 @@ module PatchPilot
         installed_updates.map(&:kb_number).compact
       end
 
-      # Compare updates with another UpdateQuery instance
-      # Useful for comparing Deep Freeze endpoint vs control endpoint
+      # Compare security updates with another UpdateQuery instance.
+      # Only includes security updates (filters out driver/feature updates).
+      # Useful for verifying Deep Freeze endpoints receive security patches via DFE.
       #
       # @param other [UpdateQuery] another UpdateQuery instance to compare against
       # @return [Hash] comparison results with :common, :only_self, :only_other keys
+      #   Each entry is a Hash with :kb and :title
       def compare_with(other)
-        self_kbs = Set.new(kb_numbers)
-        other_kbs = Set.new(other.kb_numbers)
+        self_security  = security_updates
+        other_security = other.security_updates
+
+        self_kbs  = Set.new(self_security.map(&:kb_number).compact)
+        other_kbs = Set.new(other_security.map(&:kb_number).compact)
+
+        self_by_kb  = self_security.each_with_object({}) { |u, h| h[u.kb_number] = u }
+        other_by_kb = other_security.each_with_object({}) { |u, h| h[u.kb_number] = u }
 
         {
-          common: (self_kbs & other_kbs).to_a.sort,
-          only_self: (self_kbs - other_kbs).to_a.sort,
-          only_other: (other_kbs - self_kbs).to_a.sort
+          common:     (self_kbs & other_kbs).sort.map { |kb| update_entry(self_by_kb[kb]) },
+          only_self:  (self_kbs - other_kbs).sort.map  { |kb| update_entry(self_by_kb[kb]) },
+          only_other: (other_kbs - self_kbs).sort.map  { |kb| update_entry(other_by_kb[kb]) }
         }
       end
 
@@ -126,6 +134,30 @@ module PatchPilot
         <<~PS
           $seen = @{}
           $updates = @()
+          $Session = New-Object -ComObject Microsoft.Update.Session
+          $Searcher = $Session.CreateUpdateSearcher()
+          $HistoryCount = $Searcher.GetTotalHistoryCount()
+          if ($HistoryCount -gt 0) {
+              $History = $Searcher.QueryHistory(0, $HistoryCount)
+              for ($i = 0; $i -lt $History.Count; $i++) {
+                  $Entry = $History.Item($i)
+                  if ($Entry.Operation -ne 1) { continue }
+                  if ($Entry.ResultCode -ne 2 -and $Entry.ResultCode -ne 3) { continue }
+                  $kb = ''
+                  if ($Entry.Title -match '\(KB(\d+)\)') { $kb = $Matches[1] }
+                  if ([string]::IsNullOrEmpty($kb)) { continue }
+                  if ($seen.ContainsKey($kb)) { continue }
+                  $seen[$kb] = $true
+                  $desc = if ($Entry.Title -match 'Security|Malicious') { 'Security Update' }
+                          else { 'Update' }
+                  $updates += [PSCustomObject]@{
+                      KBArticleIDs = $kb
+                      Description  = $desc
+                      Title        = $Entry.Title
+                      InstalledOn  = $Entry.Date.ToString('M/d/yyyy h:mm:ss tt')
+                  }
+              }
+          }
           foreach ($hf in (Get-HotFix)) {
               $kb = $hf.HotFixID
               if ([string]::IsNullOrEmpty($kb) -or $kb -eq 'File 1') { continue }
@@ -140,30 +172,8 @@ module PatchPilot
               $updates += [PSCustomObject]@{
                   KBArticleIDs = $kbNum
                   Description  = $desc
+                  Title        = "$desc ($kb)"
                   InstalledOn  = $date
-              }
-          }
-          $Session = New-Object -ComObject Microsoft.Update.Session
-          $Searcher = $Session.CreateUpdateSearcher()
-          $HistoryCount = $Searcher.GetTotalHistoryCount()
-          if ($HistoryCount -gt 0) {
-              $History = $Searcher.QueryHistory(0, $HistoryCount)
-              for ($i = 0; $i -lt $History.Count; $i++) {
-                  $Entry = $History.Item($i)
-                  if ($Entry.Operation -ne 1) { continue }
-                  if ($Entry.ResultCode -ne 2 -and $Entry.ResultCode -ne 3) { continue }
-                  $kb = ''
-                  if ($Entry.Title -match '\\(KB(\\d+)\\)') { $kb = $Matches[1] }
-                  if ([string]::IsNullOrEmpty($kb)) { continue }
-                  if ($seen.ContainsKey($kb)) { continue }
-                  $seen[$kb] = $true
-                  $desc = if ($Entry.Title -match 'Security|Malicious') { 'Security Update' }
-                          else { 'Update' }
-                  $updates += [PSCustomObject]@{
-                      KBArticleIDs = $kb
-                      Description  = $desc
-                      InstalledOn  = $Entry.Date.ToString('M/d/yyyy h:mm:ss tt')
-                  }
               }
           }
           if ($updates.Count -eq 0) { Write-Output '[]' }
@@ -189,7 +199,8 @@ module PatchPilot
           kb_number: normalize_kb(entry['KBArticleIDs']),
           description: entry['Description'],
           installed_on: parse_date(entry['InstalledOn']),
-          installed_by: nil
+          installed_by: nil,
+          title: entry['Title']
         )
       end
 
@@ -206,6 +217,10 @@ module PatchPilot
         DateTime.strptime(date_string.strip, '%m/%d/%Y %I:%M:%S %p').to_date
       rescue ArgumentError
         nil
+      end
+
+      def update_entry(update)
+        { kb: update.kb_number, title: update.title || update.description || update.kb_number.to_s }
       end
 
       def date_range_string(updates)

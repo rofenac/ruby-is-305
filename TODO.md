@@ -12,13 +12,21 @@ Test via the dashboard:
 - End-to-end integration testing against lab environment
 - Scheduled/automated patch runs
 - Reporting and history tracking
-- Add update `title` field from COM API to installed updates display
+- Add update `title` field to the installed updates table in the asset detail modal (API already captures it via `Update#title`; `update_to_hash` in server.rb does not yet expose it)
 - **SB4 intermittent comms loss** (recurring): host drops mid-session. `session.loop` blocks indefinitely when a host goes unresponsive — need a configurable per-credential command timeout so hung sessions fail cleanly instead of hanging forever.
 - **SB3 partial upgrade stall** (recurring): installs most packages but consistently stops with ~10 remaining. Retrying the upgrade fails (likely a lock file or partial dpkg state). Need to investigate root cause — possibly a post-install script hanging, a held package, or a dpkg lock not being released. A timeout on `session.loop` (see above) would also help surface this failure cleanly.
 
 ---
 
 # Completed
+
+## Compare View: Security Updates + Icon Consistency (2026-03-16)
+- `UpdateQuery#compare_with` now filters to **security updates only** (via `security_update?`) and returns `{ kb:, title: }` hashes instead of plain KB number strings
+- PowerShell query script restructured: WU history (`QueryHistory`) runs first to capture full update titles (e.g. `2026-03 Cumulative Update for Windows 10 (KB5079473)`); `Get-HotFix` runs as fallback for anything not in history. Fixed broken KB extraction regex (`\(KB(\d+)\)` was incorrectly escaped in the original).
+- `Update` struct gains `:title` field; `build_update` populates it from `$Entry.Title` (WU history) or constructs `"Security Update (KB...)"` from HotFix fallback
+- `ComparisonResponse` TypeScript type split into discriminated union: `WindowsComparisonResponse` (entries are `SecurityUpdateEntry[]`) vs `LinuxComparisonResponse` (entries are `string[]`)
+- Compare page: full update names shown in results lists, header says "Security Update Comparison", Deep Freeze analysis section explicitly confirms whether DFE is applying patches
+- Icon consistency: `AssetDetail` modal header and `CompareView` selection cards now use `OsIcon` / `WindowsIcon` / `LinuxIcon` from `osIcon.tsx` instead of plain `🪟`/`🐧` emojis
 
 ## Frontend Login Page + Logout (2026-03-16)
 - `GET /api/auth/verify` endpoint added to backend (protected by existing basic auth)

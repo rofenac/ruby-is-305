@@ -58,21 +58,42 @@ export interface LinuxPackagesResponse {
 
 export type UpdatesResponse = WindowsUpdatesResponse | LinuxPackagesResponse;
 
-export interface ComparisonResponse {
+export interface SecurityUpdateEntry {
+  kb: string | null;
+  title: string;
+}
+
+interface ComparisonSummary {
+  common_count: number;
+  only_first_count: number;
+  only_second_count: number;
+}
+
+export interface WindowsComparisonResponse {
   asset1: string;
   asset2: string;
-  type: 'windows_updates' | 'linux_packages';
+  type: 'windows_updates';
+  comparison: {
+    common: SecurityUpdateEntry[];
+    only_in_first: SecurityUpdateEntry[];
+    only_in_second: SecurityUpdateEntry[];
+  };
+  summary: ComparisonSummary;
+}
+
+export interface LinuxComparisonResponse {
+  asset1: string;
+  asset2: string;
+  type: 'linux_packages';
   comparison: {
     common: string[];
     only_in_first: string[];
     only_in_second: string[];
   };
-  summary: {
-    common_count: number;
-    only_first_count: number;
-    only_second_count: number;
-  };
+  summary: ComparisonSummary;
 }
+
+export type ComparisonResponse = WindowsComparisonResponse | LinuxComparisonResponse;
 
 export interface HealthResponse {
   status: string;

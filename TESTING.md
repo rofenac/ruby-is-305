@@ -92,6 +92,8 @@ conn.close
 
 ### Compare Deep Freeze vs Control Endpoint
 
+`compare_with` filters to **security updates only** and returns `{ kb:, title: }` hashes.
+
 ```bash
 export $(grep -v '^#' .env | xargs) && bundle exec ruby -e "
 require_relative 'lib/patch_pilot'
@@ -110,11 +112,12 @@ conn2 = control.connect(inventory)
 conn2.connect
 query2 = PatchPilot::Windows::UpdateQuery.new(conn2)
 
-# Compare
+# Compare security updates
 comparison = query1.compare_with(query2)
-puts \"Common: #{comparison[:common].count}\"
-puts \"Only frozen: #{comparison[:only_self].join(', ')}\"
-puts \"Only control: #{comparison[:only_other].join(', ')}\"
+puts \"Common security updates: #{comparison[:common].count}\"
+puts \"Missing from frozen endpoint: #{comparison[:only_other].count}\"
+comparison[:only_other].each { |u| puts \"  #{u[:title]}\" }
+comparison[:only_self].each  { |u| puts \"  Only on frozen: #{u[:title]}\" }
 
 conn1.close
 conn2.close

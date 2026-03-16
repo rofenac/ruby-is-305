@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
-import type { Asset, InventoryResponse, ComparisonResponse } from '../types';
+import type { Asset, InventoryResponse, ComparisonResponse, SecurityUpdateEntry } from '../types';
+import { OsIcon, WindowsIcon, LinuxIcon } from '../utils/osIcon';
 import { compareAssets } from '../api/client';
 
 interface CompareViewProps {
@@ -108,7 +109,7 @@ export function CompareView({ inventory }: CompareViewProps) {
               <div className="mb-4">
                 <label className="label">
                   <span className="label-text flex items-center gap-2">
-                    <span>🪟</span> Windows
+                    <WindowsIcon size={16} /> Windows
                   </span>
                 </label>
                 <select
@@ -130,7 +131,7 @@ export function CompareView({ inventory }: CompareViewProps) {
               <div>
                 <label className="label">
                   <span className="label-text flex items-center gap-2">
-                    <span>🐧</span> Linux
+                    <LinuxIcon size={16} /> Linux
                   </span>
                 </label>
                 <select
@@ -150,9 +151,7 @@ export function CompareView({ inventory }: CompareViewProps) {
 
             {selectedAsset1 && (
               <div className="mt-4 p-3 rounded-lg bg-base-200/50 flex items-center gap-3">
-                <span className="text-2xl">
-                  {selectedAsset1.os.toLowerCase().includes('windows') ? '🪟' : '🐧'}
-                </span>
+                <OsIcon asset={selectedAsset1} size={28} />
                 <div>
                   <p className="font-medium">{selectedAsset1.name}</p>
                   <p className="text-sm text-base-content/60">{selectedAsset1.os}</p>
@@ -176,7 +175,7 @@ export function CompareView({ inventory }: CompareViewProps) {
               <div className="mb-4">
                 <label className="label">
                   <span className="label-text flex items-center gap-2">
-                    <span>🪟</span> Windows
+                    <WindowsIcon size={16} /> Windows
                   </span>
                 </label>
                 <select
@@ -198,7 +197,7 @@ export function CompareView({ inventory }: CompareViewProps) {
               <div>
                 <label className="label">
                   <span className="label-text flex items-center gap-2">
-                    <span>🐧</span> Linux
+                    <LinuxIcon size={16} /> Linux
                   </span>
                 </label>
                 <select
@@ -218,9 +217,7 @@ export function CompareView({ inventory }: CompareViewProps) {
 
             {selectedAsset2 && (
               <div className="mt-4 p-3 rounded-lg bg-base-200/50 flex items-center gap-3">
-                <span className="text-2xl">
-                  {selectedAsset2.os.toLowerCase().includes('windows') ? '🪟' : '🐧'}
-                </span>
+                <OsIcon asset={selectedAsset2} size={28} />
                 <div>
                   <p className="font-medium">{selectedAsset2.name}</p>
                   <p className="text-sm text-base-content/60">{selectedAsset2.os}</p>
@@ -276,6 +273,32 @@ interface ComparisonResultsProps {
   asset2: Asset;
 }
 
+function ItemList({ items, isWindows }: { items: SecurityUpdateEntry[] | string[]; isWindows: boolean }) {
+  if (items.length === 0) {
+    return <p className="text-base-content/50 italic">None</p>;
+  }
+  if (isWindows) {
+    return (
+      <ul className="space-y-1">
+        {(items as SecurityUpdateEntry[]).map((entry) => (
+          <li key={entry.kb ?? entry.title} className="text-sm p-2 rounded bg-base-200/50 leading-snug">
+            {entry.title}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <ul className="space-y-1">
+      {(items as string[]).map((item) => (
+        <li key={item} className="text-sm p-2 rounded bg-base-200/50">
+          <code>{item}</code>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ComparisonResults({ comparison, asset1, asset2 }: ComparisonResultsProps) {
   const cardsRef = useRef<HTMLDivElement>(null);
 
@@ -298,7 +321,11 @@ function ComparisonResults({ comparison, asset1, asset2 }: ComparisonResultsProp
   }, { scope: cardsRef, dependencies: [comparison] });
 
   const isWindows = comparison.type === 'windows_updates';
-  const itemLabel = isWindows ? 'Updates' : 'Packages';
+  const itemLabel = isWindows ? 'Security Updates' : 'Packages';
+
+  const common     = comparison.comparison.common     as SecurityUpdateEntry[] | string[];
+  const onlyFirst  = comparison.comparison.only_in_first  as SecurityUpdateEntry[] | string[];
+  const onlySecond = comparison.comparison.only_in_second as SecurityUpdateEntry[] | string[];
 
   return (
     <div className="space-y-6">
@@ -306,7 +333,7 @@ function ComparisonResults({ comparison, asset1, asset2 }: ComparisonResultsProp
       <div className="card bg-gradient-to-r from-primary/20 to-secondary/20 border border-primary/30">
         <div className="card-body">
           <h3 className="card-title justify-center text-xl mb-4">
-            Comparison Summary
+            {isWindows ? 'Security Update Comparison' : 'Package Comparison'}
           </h3>
           <div ref={cardsRef} className="grid grid-cols-3 gap-4 text-center">
             <div className="stat">
@@ -332,20 +359,10 @@ function ComparisonResults({ comparison, asset1, asset2 }: ComparisonResultsProp
           <div className="card-body">
             <h4 className="card-title text-success text-lg">
               <span>✓</span>
-              Common ({comparison.comparison.common.length})
+              Common ({common.length})
             </h4>
             <div className="max-h-64 overflow-y-auto">
-              {comparison.comparison.common.length > 0 ? (
-                <ul className="space-y-1">
-                  {comparison.comparison.common.map((item) => (
-                    <li key={item} className="text-sm p-2 rounded bg-base-200/50">
-                      <code>{item}</code>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-base-content/50 italic">No common items</p>
-              )}
+              <ItemList items={common} isWindows={isWindows} />
             </div>
           </div>
         </div>
@@ -355,20 +372,10 @@ function ComparisonResults({ comparison, asset1, asset2 }: ComparisonResultsProp
           <div className="card-body">
             <h4 className="card-title text-info text-lg">
               <span>①</span>
-              Only in {asset1.name} ({comparison.comparison.only_in_first.length})
+              Only in {asset1.name} ({onlyFirst.length})
             </h4>
             <div className="max-h-64 overflow-y-auto">
-              {comparison.comparison.only_in_first.length > 0 ? (
-                <ul className="space-y-1">
-                  {comparison.comparison.only_in_first.map((item) => (
-                    <li key={item} className="text-sm p-2 rounded bg-base-200/50">
-                      <code>{item}</code>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-base-content/50 italic">No unique items</p>
-              )}
+              <ItemList items={onlyFirst} isWindows={isWindows} />
             </div>
           </div>
         </div>
@@ -378,57 +385,50 @@ function ComparisonResults({ comparison, asset1, asset2 }: ComparisonResultsProp
           <div className="card-body">
             <h4 className="card-title text-warning text-lg">
               <span>②</span>
-              Only in {asset2.name} ({comparison.comparison.only_in_second.length})
+              Only in {asset2.name} ({onlySecond.length})
             </h4>
             <div className="max-h-64 overflow-y-auto">
-              {comparison.comparison.only_in_second.length > 0 ? (
-                <ul className="space-y-1">
-                  {comparison.comparison.only_in_second.map((item) => (
-                    <li key={item} className="text-sm p-2 rounded bg-base-200/50">
-                      <code>{item}</code>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-base-content/50 italic">No unique items</p>
-              )}
+              <ItemList items={onlySecond} isWindows={isWindows} />
             </div>
           </div>
         </div>
       </div>
 
       {/* Deep Freeze Analysis */}
-      {(asset1.deep_freeze || asset2.deep_freeze) && (
+      {isWindows && (asset1.deep_freeze || asset2.deep_freeze) && (
         <div className="card bg-gradient-to-r from-accent/20 to-primary/20 border border-accent/30">
           <div className="card-body">
             <h4 className="card-title">
               <span>❄️</span>
-              Deep Freeze Analysis
+              Deep Freeze Security Patch Analysis
             </h4>
             <div className="prose prose-sm">
               {asset1.deep_freeze && !asset2.deep_freeze && (
                 <p>
-                  <strong>{asset1.name}</strong> has Deep Freeze enabled.
-                  {comparison.summary.only_second_count > 0 && (
+                  <strong>{asset1.name}</strong> is managed by Deep Freeze.
+                  {comparison.summary.only_second_count > 0 ? (
                     <span className="text-warning">
-                      {' '}There are {comparison.summary.only_second_count} {itemLabel.toLowerCase()} on the control
-                      endpoint that are missing from the frozen endpoint.
+                      {' '}{comparison.summary.only_second_count} security update(s) on {asset2.name} are
+                      missing from the frozen endpoint — DFE may not have applied them yet.
                     </span>
-                  )}
-                  {comparison.summary.only_second_count === 0 && (
+                  ) : (
                     <span className="text-success">
-                      {' '}Both systems have the same {itemLabel.toLowerCase()} - Deep Freeze appears to be working correctly.
+                      {' '}Both endpoints have identical security updates — DFE is applying patches correctly.
                     </span>
                   )}
                 </p>
               )}
               {asset2.deep_freeze && !asset1.deep_freeze && (
                 <p>
-                  <strong>{asset2.name}</strong> has Deep Freeze enabled.
-                  {comparison.summary.only_first_count > 0 && (
+                  <strong>{asset2.name}</strong> is managed by Deep Freeze.
+                  {comparison.summary.only_first_count > 0 ? (
                     <span className="text-warning">
-                      {' '}There are {comparison.summary.only_first_count} {itemLabel.toLowerCase()} on the control
-                      endpoint that are missing from the frozen endpoint.
+                      {' '}{comparison.summary.only_first_count} security update(s) on {asset1.name} are
+                      missing from the frozen endpoint — DFE may not have applied them yet.
+                    </span>
+                  ) : (
+                    <span className="text-success">
+                      {' '}Both endpoints have identical security updates — DFE is applying patches correctly.
                     </span>
                   )}
                 </p>

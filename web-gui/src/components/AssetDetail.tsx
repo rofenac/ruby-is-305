@@ -9,6 +9,7 @@ import {
   getAssetUpdates, getAvailableUpdates, installUpdates,
   upgradePackages, getRebootStatus, rebootAsset,
 } from '../api/client';
+import { OsIcon } from '../utils/osIcon';
 
 interface AssetDetailProps {
   asset: Asset;
@@ -146,7 +147,7 @@ export function AssetDetail({ asset, onClose }: AssetDetailProps) {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-base-content/10 bg-base-200/50">
           <div className="flex items-center gap-4">
-            <span className="text-4xl">{isWindows ? '🪟' : '🐧'}</span>
+            <OsIcon asset={asset} size={40} />
             <div>
               <h2 className="text-2xl font-bold">{asset.name}</h2>
               <p className="text-base-content/60">{asset.ip} • {asset.os}</p>
