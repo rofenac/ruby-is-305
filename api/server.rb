@@ -47,7 +47,7 @@ helpers do
   end
 
   def public_path?
-    request.options? || request.path_info == '/api/health'
+    request.options? || !api_request? || request.path_info == '/api/health'
   end
 
   def enforce_basic_auth!
