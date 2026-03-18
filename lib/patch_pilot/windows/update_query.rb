@@ -2,6 +2,7 @@
 
 require 'json'
 require 'date'
+require_relative 'kb_helpers'
 
 module PatchPilot
   module Windows
@@ -32,6 +33,8 @@ module PatchPilot
     # Uses IUpdateSearcher.Search("IsInstalled=1") which returns the complete
     # set of installed updates — unlike Get-HotFix which only returns CBS hotfixes.
     class UpdateQuery # rubocop:disable Metrics/ClassLength
+      include KbHelpers
+
       attr_reader :connection
 
       # Initialize with an established connection
@@ -97,19 +100,14 @@ module PatchPilot
       # @return [Hash] comparison results with :common, :only_self, :only_other keys
       #   Each entry is a Hash with :kb and :title
       def compare_with(other)
-        self_security  = security_updates
-        other_security = other.security_updates
-
-        self_kbs  = Set.new(self_security.map(&:kb_number).compact)
-        other_kbs = Set.new(other_security.map(&:kb_number).compact)
-
-        self_by_kb  = self_security.each_with_object({}) { |u, h| h[u.kb_number] = u }
-        other_by_kb = other_security.each_with_object({}) { |u, h| h[u.kb_number] = u }
-
+        self_index = security_update_index(security_updates)
+        other_index = security_update_index(other.security_updates)
+        self_kbs = Set.new(self_index.keys)
+        other_kbs = Set.new(other_index.keys)
         {
-          common:     (self_kbs & other_kbs).sort.map { |kb| update_entry(self_by_kb[kb]) },
-          only_self:  (self_kbs - other_kbs).sort.map  { |kb| update_entry(self_by_kb[kb]) },
-          only_other: (other_kbs - self_kbs).sort.map  { |kb| update_entry(other_by_kb[kb]) }
+          common: sorted_entries(self_kbs & other_kbs, self_index),
+          only_self: sorted_entries(self_kbs - other_kbs, self_index),
+          only_other: sorted_entries(other_kbs - self_kbs, other_index)
         }
       end
 
@@ -144,7 +142,7 @@ module PatchPilot
                   if ($Entry.Operation -ne 1) { continue }
                   if ($Entry.ResultCode -ne 2 -and $Entry.ResultCode -ne 3) { continue }
                   $kb = ''
-                  if ($Entry.Title -match '\(KB(\d+)\)') { $kb = $Matches[1] }
+                  if ($Entry.Title -match '\\(KB(\\d+)\\)') { $kb = $Matches[1] }
                   if ([string]::IsNullOrEmpty($kb)) { continue }
                   if ($seen.ContainsKey($kb)) { continue }
                   $seen[$kb] = $true
@@ -204,13 +202,6 @@ module PatchPilot
         )
       end
 
-      def normalize_kb(raw)
-        return nil if raw.nil? || raw.to_s.strip.empty?
-
-        kb = raw.strip.split(',').first
-        kb.start_with?('KB') ? kb : "KB#{kb}"
-      end
-
       def parse_date(date_string)
         return nil if date_string.nil? || date_string.strip.empty?
 
@@ -221,6 +212,14 @@ module PatchPilot
 
       def update_entry(update)
         { kb: update.kb_number, title: update.title || update.description || update.kb_number.to_s }
+      end
+
+      def security_update_index(updates)
+        updates.to_h { |u| [u.kb_number, u] }
+      end
+
+      def sorted_entries(kbs, index)
+        kbs.sort.map { |kb| update_entry(index[kb]) }
       end
 
       def date_range_string(updates)

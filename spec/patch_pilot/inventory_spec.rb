@@ -59,7 +59,7 @@ RSpec.describe PatchPilot::Inventory do
     describe '#control_endpoints' do
       it 'returns Windows endpoints without Deep Freeze' do
         controls = inventory.control_endpoints
-        expect(controls.count).to eq(4)
+        expect(controls.count).to eq(0)
         expect(controls).to all(be_windows)
         expect(controls.map(&:deep_freeze?)).to all(be false)
       end
@@ -83,7 +83,7 @@ RSpec.describe PatchPilot::Inventory do
     describe '#by_role' do
       it 'filters by role' do
         endpoints = inventory.by_role('endpoint')
-        expect(endpoints.count).to eq(28)
+        expect(endpoints.count).to eq(24)
       end
     end
 

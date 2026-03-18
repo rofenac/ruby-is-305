@@ -89,7 +89,6 @@ RSpec.describe 'PatchPilot API - Execution Endpoints' do
     it 'requires basic auth for API requests when configured' do
       get '/api/inventory'
       expect(last_response.status).to eq(401)
-      expect(last_response.headers['WWW-Authenticate']).to include('Basic')
       body = JSON.parse(last_response.body)
       expect(body['error']).to include('Authentication required')
     end

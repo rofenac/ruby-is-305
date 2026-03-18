@@ -32,8 +32,11 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Basic ${token}` } : {};
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { headers: authHeaders() });
+async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    ...init,
+    headers: { ...authHeaders(), ...(init?.headers ?? {}) },
+  });
   if (response.status === 401) throw new Error('Unauthorized');
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -48,46 +51,32 @@ export async function verifyAuth(): Promise<boolean> {
 }
 
 export async function getHealth(): Promise<HealthResponse> {
-  return fetchJson<HealthResponse>(`${API_BASE}/health`);
+  return apiFetch<HealthResponse>(`${API_BASE}/health`);
 }
 
 export async function getInventory(): Promise<InventoryResponse> {
-  return fetchJson<InventoryResponse>(`${API_BASE}/inventory`);
+  return apiFetch<InventoryResponse>(`${API_BASE}/inventory`);
 }
 
 export async function getAsset(name: string): Promise<Asset> {
-  return fetchJson<Asset>(`${API_BASE}/assets/${encodeURIComponent(name)}`);
+  return apiFetch<Asset>(`${API_BASE}/assets/${encodeURIComponent(name)}`);
 }
 
 export async function getAssetStatus(name: string): Promise<AssetStatus> {
-  return fetchJson<AssetStatus>(`${API_BASE}/assets/${encodeURIComponent(name)}/status`);
+  return apiFetch<AssetStatus>(`${API_BASE}/assets/${encodeURIComponent(name)}/status`);
 }
 
 export async function getAssetUpdates(name: string): Promise<UpdatesResponse> {
-  return fetchJson<UpdatesResponse>(`${API_BASE}/assets/${encodeURIComponent(name)}/updates`);
+  return apiFetch<UpdatesResponse>(`${API_BASE}/assets/${encodeURIComponent(name)}/updates`);
 }
 
 export async function compareAssets(asset1: string, asset2: string): Promise<ComparisonResponse> {
   const params = new URLSearchParams({ asset1, asset2 });
-  return fetchJson<ComparisonResponse>(`${API_BASE}/compare?${params}`);
-}
-
-async function postJson<T>(url: string, body?: unknown): Promise<T> {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (response.status === 401) throw new Error('Unauthorized');
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
-  }
-  return response.json();
+  return apiFetch<ComparisonResponse>(`${API_BASE}/compare?${params}`);
 }
 
 export async function getAvailableUpdates(name: string): Promise<AvailableUpdatesResponse> {
-  return fetchJson<AvailableUpdatesResponse>(
+  return apiFetch<AvailableUpdatesResponse>(
     `${API_BASE}/assets/${encodeURIComponent(name)}/updates/available`
   );
 }
@@ -97,9 +86,9 @@ export async function installUpdates(
   kbNumbers?: string[]
 ): Promise<InstallUpdatesResponse> {
   const body = kbNumbers?.length ? { kb_numbers: kbNumbers } : undefined;
-  return postJson<InstallUpdatesResponse>(
+  return apiFetch<InstallUpdatesResponse>(
     `${API_BASE}/assets/${encodeURIComponent(name)}/updates/install`,
-    body
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }
   );
 }
 
@@ -108,20 +97,21 @@ export async function upgradePackages(
   packages?: string[]
 ): Promise<UpgradeResponse> {
   const body = packages?.length ? { packages } : undefined;
-  return postJson<UpgradeResponse>(
+  return apiFetch<UpgradeResponse>(
     `${API_BASE}/assets/${encodeURIComponent(name)}/packages/upgrade`,
-    body
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }
   );
 }
 
 export async function getRebootStatus(name: string): Promise<RebootStatusResponse> {
-  return fetchJson<RebootStatusResponse>(
+  return apiFetch<RebootStatusResponse>(
     `${API_BASE}/assets/${encodeURIComponent(name)}/reboot-status`
   );
 }
 
 export async function rebootAsset(name: string): Promise<RebootResponse> {
-  return postJson<RebootResponse>(
-    `${API_BASE}/assets/${encodeURIComponent(name)}/reboot`
+  return apiFetch<RebootResponse>(
+    `${API_BASE}/assets/${encodeURIComponent(name)}/reboot`,
+    { method: 'POST' }
   );
 }

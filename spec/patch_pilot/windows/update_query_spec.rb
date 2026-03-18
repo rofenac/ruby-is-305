@@ -168,19 +168,20 @@ RSpec.describe PatchPilot::Windows::UpdateQuery do
       allow(other_connection).to receive(:execute).and_return(other_result)
     end
 
-    it 'identifies common updates' do
+    it 'identifies common security updates' do
       comparison = query.compare_with(other_query)
-      expect(comparison[:common]).to contain_exactly('KB5066131', 'KB5073379')
+      expect(comparison[:common]).to contain_exactly(a_hash_including(kb: 'KB5073379'))
     end
 
-    it 'identifies updates only in self' do
+    it 'identifies security updates only in self' do
       comparison = query.compare_with(other_query)
-      expect(comparison[:only_self]).to contain_exactly('KB5072725', 'KB5071142')
+      expect(comparison[:only_self]).to contain_exactly(a_hash_including(kb: 'KB5072725'))
     end
 
-    it 'identifies updates only in other' do
+    it 'identifies security updates only in other' do
+      # KB9999999 has description 'Update' (not security), so it is excluded
       comparison = query.compare_with(other_query)
-      expect(comparison[:only_other]).to contain_exactly('KB9999999')
+      expect(comparison[:only_other]).to eq([])
     end
   end
 

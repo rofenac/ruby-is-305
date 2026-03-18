@@ -12,13 +12,24 @@ Test via the dashboard:
 - End-to-end integration testing against lab environment
 - Scheduled/automated patch runs
 - Reporting and history tracking
-- Add update `title` field to the installed updates table in the asset detail modal (API already captures it via `Update#title`; `update_to_hash` in server.rb does not yet expose it)
+- Add update `title` field to the installed updates table in the asset detail modal (API already captures it via `Update#title`; `update_to_hash` in `lib/patch_pilot/serializers.rb` does not yet expose it)
 - **SB4 intermittent comms loss** (recurring): host drops mid-session. `session.loop` blocks indefinitely when a host goes unresponsive — need a configurable per-credential command timeout so hung sessions fail cleanly instead of hanging forever.
 - **SB3 partial upgrade stall** (recurring): installs most packages but consistently stops with ~10 remaining. Retrying the upgrade fails (likely a lock file or partial dpkg state). Need to investigate root cause — possibly a post-install script hanging, a held package, or a dpkg lock not being released. A timeout on `session.loop` (see above) would also help surface this failure cleanly.
 
 ---
 
 # Completed
+
+## Refactor + Auth Fix (2026-03-18)
+- **Browser auth dialog suppressed**: removed `WWW-Authenticate: Basic` header from 401 responses — browser no longer shows its native credential modal; custom login page handles all auth UI
+- **`download_updates` timeout fix**: was calling WinRM directly, now runs through the scheduled task wrapper (same as install) — large downloads no longer time out the WinRM session
+- **Dead code removed**: `action_script` install branch and `install_powershell_block` in `UpdateExecutor` were unreachable; removed
+- **`normalize_kb` deduplication**: extracted to `lib/patch_pilot/windows/kb_helpers.rb` (`KbHelpers` module), included by both `UpdateQuery` and `UpdateExecutor`
+- **Serializers extracted**: all `*_to_hash` and response-builder helpers moved to `lib/patch_pilot/serializers.rb` (`PatchPilot::Serializers`); server.rb helpers block reduced to Sinatra-coupled concerns only
+- **`client.ts` simplified**: `fetchJson` + `postJson` merged into a single `apiFetch<T>(url, init?)` function
+- **`compare_with` refactored**: extracted `security_update_index` + `sorted_entries` helpers to bring method within RuboCop Metrics limits
+- Pre-existing spec failures fixed: inventory endpoint counts, `compare_with` hash format assertions, `WWW-Authenticate` header assertion
+- 310 RSpec tests passing, RuboCop clean, TypeScript clean
 
 ## Compare View: Security Updates + Icon Consistency (2026-03-16)
 - `UpdateQuery#compare_with` now filters to **security updates only** (via `security_update?`) and returns `{ kb:, title: }` hashes instead of plain KB number strings

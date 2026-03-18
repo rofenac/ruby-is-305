@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'json'
+require_relative 'kb_helpers'
 
 module PatchPilot
   module Windows
@@ -74,6 +75,8 @@ module PatchPilot
     # @example Install specific KBs only
     #   result = executor.install_updates(kb_numbers: ['KB5073379'])
     class UpdateExecutor # rubocop:disable Metrics/ClassLength
+      include KbHelpers
+
       RESULT_CODES = {
         0 => 'NotStarted',
         1 => 'InProgress',
@@ -155,7 +158,7 @@ module PatchPilot
       end
 
       def execute_update_action(action, kb_numbers)
-        script = action == :install ? install_task_script(kb_numbers) : action_script(:download, kb_numbers)
+        script = action == :install ? install_task_script(kb_numbers) : download_task_script(kb_numbers)
         result = connection.execute(script)
         validate_result!(result, action.to_s)
         parse_installation_result(result.stdout)
@@ -163,6 +166,14 @@ module PatchPilot
 
       def search_task_script
         build_task_wrapper(inner_search_script, task_name: 'Search')
+      end
+
+      def download_task_script(kb_numbers)
+        build_task_wrapper(inner_download_script(kb_numbers), task_name: 'Download')
+      end
+
+      def install_task_script(kb_numbers)
+        build_task_wrapper(inner_install_script(kb_numbers), task_name: 'Install')
       end
 
       # rubocop:disable Metrics/MethodLength
@@ -203,65 +214,60 @@ module PatchPilot
         PS
       end
 
-      def action_script(action, kb_numbers)
+      def inner_download_script(kb_numbers)
         kb_filter = build_kb_filter(kb_numbers)
-        install_block = action == :install ? install_powershell_block : ''
-
-        <<~PS
-          $Session = New-Object -ComObject Microsoft.Update.Session
-          $Searcher = $Session.CreateUpdateSearcher()
-          $Searcher.ServerSelection = 2
-          $SearchResult = $Searcher.Search("IsInstalled=0")
-          #{kb_filter}
-          $UpdateColl = New-Object -ComObject Microsoft.Update.UpdateColl
-          foreach ($Update in $SearchResult.Updates) {
-              if ($Update.EulaAccepted -eq $false) { $Update.AcceptEula() }
-              $kbs = @($Update.KBArticleIDs)
-              $match = $KBFilter.Count -eq 0
-              foreach ($kb in $kbs) {
-                  if ($KBFilter -contains $kb) { $match = $true; break }
-              }
-              if ($match) { $UpdateColl.Add($Update) | Out-Null }
-          }
-          if ($UpdateColl.Count -eq 0) {
-              Write-Output '{"ResultCode":2,"RebootRequired":false,"UpdateCount":0,"Updates":[]}'
-          } else {
-              $Downloader = $Session.CreateUpdateDownloader()
-              $Downloader.Updates = $UpdateColl
-              $DlResult = $Downloader.Download()
-              #{install_block}
-              $FinalResult = #{action == :install ? '$InstResult' : '$DlResult'}
-              $results = @()
-              for ($i = 0; $i -lt $UpdateColl.Count; $i++) {
-                  $u = $UpdateColl.Item($i)
-                  $r = $FinalResult.GetUpdateResult($i)
-                  $results += [PSCustomObject]@{
-                      KBArticleIDs = (@($u.KBArticleIDs) -join ',')
-                      Title        = $u.Title
-                      ResultCode   = [int]$r.ResultCode
+        <<~'PS'.sub('KBFILTER_PLACEHOLDER', kb_filter)
+          $ErrorActionPreference = 'Stop'
+          $resultPath = 'C:\Windows\Temp\PatchPilotDownload_result.json'
+          try {
+              $Session = New-Object -ComObject Microsoft.Update.Session
+              $Searcher = $Session.CreateUpdateSearcher()
+              $Searcher.ServerSelection = 2
+              $SearchResult = $Searcher.Search("IsInstalled=0")
+              KBFILTER_PLACEHOLDER
+              $UpdateColl = New-Object -ComObject Microsoft.Update.UpdateColl
+              foreach ($Update in $SearchResult.Updates) {
+                  if ($Update.EulaAccepted -eq $false) { $Update.AcceptEula() }
+                  $kbs = @($Update.KBArticleIDs)
+                  $match = $KBFilter.Count -eq 0
+                  foreach ($kb in $kbs) {
+                      if ($KBFilter -contains $kb) { $match = $true; break }
                   }
+                  if ($match) { $UpdateColl.Add($Update) | Out-Null }
               }
-              $out = @{
-                  ResultCode     = [int]$FinalResult.ResultCode
-                  RebootRequired = [bool]$FinalResult.RebootRequired
-                  UpdateCount    = $UpdateColl.Count
-                  Updates        = @($results)
+              if ($UpdateColl.Count -eq 0) {
+                  '{"ResultCode":2,"RebootRequired":false,"UpdateCount":0,"Updates":[]}' |
+                      Set-Content -Path $resultPath -Encoding UTF8
+              } else {
+                  $Downloader = $Session.CreateUpdateDownloader()
+                  $Downloader.Updates = $UpdateColl
+                  $DlResult = $Downloader.Download()
+                  $results = @()
+                  for ($i = 0; $i -lt $UpdateColl.Count; $i++) {
+                      $u = $UpdateColl.Item($i)
+                      $r = $DlResult.GetUpdateResult($i)
+                      $results += [PSCustomObject]@{
+                          KBArticleIDs = (@($u.KBArticleIDs) -join ',')
+                          Title        = $u.Title
+                          ResultCode   = [int]$r.ResultCode
+                      }
+                  }
+                  $out = @{
+                      ResultCode     = [int]$DlResult.ResultCode
+                      RebootRequired = $false
+                      UpdateCount    = $UpdateColl.Count
+                      Updates        = @($results)
+                  }
+                  ConvertTo-Json $out -Compress | Set-Content -Path $resultPath -Encoding UTF8
               }
-              Write-Output (ConvertTo-Json $out -Compress)
+          } catch {
+              $err = @{ ResultCode = 4; RebootRequired = $false; UpdateCount = 0;
+                        Updates = @(); Error = $_.Exception.Message }
+              ConvertTo-Json $err -Compress | Set-Content -Path $resultPath -Encoding UTF8
           }
         PS
       end
-      # rubocop:enable Metrics/MethodLength
 
-      def install_powershell_block
-        <<~PS.chomp
-          $Installer = $Session.CreateUpdateInstaller()
-              $Installer.Updates = $UpdateColl
-              $InstResult = $Installer.Install()
-        PS
-      end
-
-      # rubocop:disable Metrics/MethodLength
       def inner_install_script(kb_numbers)
         kb_filter = build_kb_filter(kb_numbers)
         <<~'PS'.sub('KBFILTER_PLACEHOLDER', kb_filter)
@@ -317,11 +323,6 @@ module PatchPilot
               ConvertTo-Json $err -Compress | Set-Content -Path $resultPath -Encoding UTF8
           }
         PS
-      end
-
-      def install_task_script(kb_numbers)
-        inner = inner_install_script(kb_numbers)
-        build_task_wrapper(inner, task_name: 'Install')
       end
 
       def build_task_wrapper(inner_script, task_name:)
@@ -428,13 +429,6 @@ module PatchPilot
           result_code: entry['ResultCode'],
           result_text: result_text_for(entry['ResultCode'])
         )
-      end
-
-      def normalize_kb(raw)
-        return nil if raw.nil? || raw.strip.empty?
-
-        kb = raw.strip.split(',').first
-        kb.start_with?('KB') ? kb : "KB#{kb}"
       end
 
       def detect_search_error!(json)
